@@ -784,11 +784,13 @@ OTSolution.Annotations = function(options) {
 
 OTSolution.Annotations.Toolbar = function(options) {
     var self = this;
+    var _toolbar = this;
 
     options || (options = {});
 
     this.session = options.session;
     this.parent = options.container;
+    this.externalWindow = options.externalWindow;
     // TODO Allow 'style' objects to be passed in for buttons, menu toolbar, etc?
     this.backgroundColor = options.backgroundColor || 'rgba(0, 0, 0, 0.7)';
     this.buttonWidth = options.buttonWidth || '40px';
@@ -932,10 +934,11 @@ OTSolution.Annotations.Toolbar = function(options) {
      */
     var ColorPicker = function(parent, colors, options) {
         var self = this;
+        var context = _toolbar.externalWindow ? _toolbar.externalWindow.document : document;
 
         this.getElm = function (el) {
             if (typeof el === "string") {
-                return document.querySelector(el);
+                return context.querySelector(el);
             }
             return el;
         };
@@ -1000,325 +1003,330 @@ OTSolution.Annotations.Toolbar = function(options) {
         }
     };
 
-    if (this.parent) {
-        var panel = document.createElement("div");
-        panel.setAttribute('id', 'OT_toolbar');
-        panel.setAttribute('class', 'OT_panel');
-        panel.style.width = '100%';
-        panel.style.height = '100%';
-        panel.style.backgroundColor = this.backgroundColor;
-        // panel.style.paddingLeft = '15px';
-        this.parent.appendChild(panel);
-        this.parent.style.position = 'relative';
-        this.parent.zIndex = 1000;
+    this.createPanel = function (externalWindow) {
+        if (_toolbar.parent) {
+            var context = externalWindow ? externalWindow.document : document;
+            var panel = context.createElement("div");
+            panel.setAttribute('id', 'OT_toolbar');
+            panel.setAttribute('class', 'OT_panel');
+            panel.style.width = '100%';
+            panel.style.height = '100%';
+            panel.style.backgroundColor = this.backgroundColor;
+            // panel.style.paddingLeft = '15px';
+            this.parent.appendChild(panel);
+            this.parent.style.position = 'relative';
+            this.parent.zIndex = 1000;
 
-        var toolbarItems = [];
-        var subPanel = document.createElement("div");
+            var toolbarItems = [];
+            var subPanel = context.createElement("div");
 
-        for (var i = 0, total = this.items.length; i < total; i++) {
-            var item = this.items[i];
+            for (var i = 0, total = this.items.length; i < total; i++) {
+                var item = this.items[i];
 
-            var button = document.createElement("input");
-            button.setAttribute('type', 'button');
-            button.setAttribute('id', item.id);
+                var button = context.createElement("input");
+                button.setAttribute('type', 'button');
+                button.setAttribute('id', item.id);
 
-            button.style.position = 'relative';
-            button.style.top = "50%";
-            button.style.transform = 'translateY(-50%)';
+                button.style.position = 'relative';
+                button.style.top = "50%";
+                button.style.transform = 'translateY(-50%)';
 
-            if (item.id === 'OT_colors') {
-                button.style.webkitTransform = 'translateY(-85%)';
+                if (item.id === 'OT_colors') {
+                    button.style.webkitTransform = 'translateY(-85%)';
 
-                var colorPicker = document.createElement("div");
-                colorPicker.setAttribute('class', 'color-picker');
-                colorPicker.style.backgroundColor = this.backgroundColor;
-                this.parent.appendChild(colorPicker);
+                    var colorPicker = context.createElement("div");
+                    colorPicker.setAttribute('class', 'color-picker');
+                    colorPicker.style.backgroundColor = this.backgroundColor;
+                    this.parent.appendChild(colorPicker);
 
-                var pk = new ColorPicker(".color-picker", this.colors, null);
+                    var pk = new ColorPicker(".color-picker", this.colors, {externalWindow: _toolbar.externalWindow});
 
-                pk.colorChosen(function (color) {
-                    var colorGroup = document.getElementById('OT_colors');
-                    colorGroup.style.backgroundColor = color;
+                    pk.colorChosen(function (color) {
+                        var colorGroup = context.getElementById('OT_colors');
+                        colorGroup.style.backgroundColor = color;
 
-                    canvases.forEach(function (canvas) {
-                        canvas.changeColor(color);
+                        canvases.forEach(function (canvas) {
+                            canvas.changeColor(color);
+                        });
                     });
-                });
 
-                var colorChoices = document.querySelectorAll('.color-choice');
+                    var colorChoices = context.querySelectorAll('.color-choice');
 
-                for (var j = 0; j < colorChoices.length; j++) {
-                    colorChoices[j].style.display='inline-block';
-                    colorChoices[j].style.width='30px';
-                    colorChoices[j].style.height='30px';
-                    colorChoices[j].style.margin='5px';
-                    colorChoices[j].style.cursor='pointer';
-                    colorChoices[j].style.borderRadius='100%';
-                    colorChoices[j].style.opacity = 0.7;
-                    colorChoices[j].onmouseover = function() {
-                        this.style.opacity = 1;
-                    };
-                    colorChoices[j].onmouseout = function() {
-                        this.style.opacity = 0.7;
-                    };
+                    for (var j = 0; j < colorChoices.length; j++) {
+                        colorChoices[j].style.display='inline-block';
+                        colorChoices[j].style.width='30px';
+                        colorChoices[j].style.height='30px';
+                        colorChoices[j].style.margin='5px';
+                        colorChoices[j].style.cursor='pointer';
+                        colorChoices[j].style.borderRadius='100%';
+                        colorChoices[j].style.opacity = 0.7;
+                        colorChoices[j].onmouseover = function() {
+                            this.style.opacity = 1;
+                        };
+                        colorChoices[j].onmouseout = function() {
+                            this.style.opacity = 0.7;
+                        };
+                    }
+
+                    button.setAttribute('class', 'OT_color');
+                    button.style.marginLeft = '10px';
+                    button.style.marginRight = '10px';
+                    button.style.borderRadius = '50%';
+                    button.style.backgroundColor = this.colors[0];
+                    button.style.width = this.iconWidth;
+                    button.style.height = this.iconHeight;
+                    button.style.paddingTop = this.buttonHeight.replace('px', '') - this.iconHeight.replace('px', '') + 'px';
+                } else {
+                    button.style.background = 'url("' + item.icon + '") no-repeat';
+                    button.style.backgroundSize = this.iconWidth + ' ' + this.iconHeight;
+                    button.style.backgroundPosition = 'center';
+                    button.style.width = this.buttonWidth;
+                    button.style.height = this.buttonHeight;
                 }
 
-                button.setAttribute('class', 'OT_color');
-                button.style.marginLeft = '10px';
-                button.style.marginRight = '10px';
-                button.style.borderRadius = '50%';
-                button.style.backgroundColor = this.colors[0];
-                button.style.width = this.iconWidth;
-                button.style.height = this.iconHeight;
-                button.style.paddingTop = this.buttonHeight.replace('px', '') - this.iconHeight.replace('px', '') + 'px';
-            } else {
-                button.style.background = 'url("' + item.icon + '") no-repeat';
-                button.style.backgroundSize = this.iconWidth + ' ' + this.iconHeight;
-                button.style.backgroundPosition = 'center';
-                button.style.width = this.buttonWidth;
-                button.style.height = this.buttonHeight;
-            }
-
-            // If we have an object as item.items, it was never set by the user
-            if (item.title === 'Line Width' && !Array.isArray(item.items)) {
-                // Add defaults
-                item.items = [
-                    {
-                        id: 'OT_line_width_2',
-                        title: 'Line Width 2',
-                        size: 2
-                    },
-                    {
-                        id: 'OT_line_width_4',
-                        title: 'Line Width 4',
-                        size: 4
-                    },
-                    {
-                        id: 'OT_line_width_6',
-                        title: 'Line Width 6',
-                        size: 6
-                    },
-                    {
-                        id: 'OT_line_width_8',
-                        title: 'Line Width 8',
-                        size: 8
-                    },
-                    {
-                        id: 'OT_line_width_10',
-                        title: 'Line Width 10',
-                        size: 10
-                    },
-                    {
-                        id: 'OT_line_width_12',
-                        title: 'Line Width 12',
-                        size: 12
-                    },
-                    {
-                        id: 'OT_line_width_14',
-                        title: 'Line Width 14',
-                        size: 14
-                    }
-                ];
-            }
-
-            if (item.items) {
-                // Indicate that we have a group
-                button.setAttribute('data-type', 'group');
-            }
-
-            button.setAttribute('data-col', item.title);
-            button.style.border = 'none';
-            button.style.cursor = 'pointer';
-
-            toolbarItems.push(button.outerHTML);
-        }
-
-        panel.innerHTML = toolbarItems.join('');
-
-        panel.onclick = function(ev) {
-            var group = ev.target.getAttribute("data-type") === 'group';
-            var itemName = ev.target.getAttribute("data-col");
-            var id = ev.target.getAttribute("id");
-
-            // Close the submenu if we are clicking on an item and not a group button
-            if (!group) {
-                self.items.forEach(function (item) {
-                    if (item.title !== 'Clear' && item.title === itemName) {
-                        if (self.selectedItem) {
-                            var lastBtn = document.getElementById(self.selectedItem.id);
-                            if (lastBtn) {
-                                lastBtn.style.background = 'url("' + self.selectedItem.icon + '") no-repeat';
-                                lastBtn.style.backgroundSize = self.iconWidth + ' ' + self.iconHeight;
-                                lastBtn.style.backgroundPosition = 'center';
-                            }
+                // If we have an object as item.items, it was never set by the user
+                if (item.title === 'Line Width' && !Array.isArray(item.items)) {
+                    // Add defaults
+                    item.items = [
+                        {
+                            id: 'OT_line_width_2',
+                            title: 'Line Width 2',
+                            size: 2
+                        },
+                        {
+                            id: 'OT_line_width_4',
+                            title: 'Line Width 4',
+                            size: 4
+                        },
+                        {
+                            id: 'OT_line_width_6',
+                            title: 'Line Width 6',
+                            size: 6
+                        },
+                        {
+                            id: 'OT_line_width_8',
+                            title: 'Line Width 8',
+                            size: 8
+                        },
+                        {
+                            id: 'OT_line_width_10',
+                            title: 'Line Width 10',
+                            size: 10
+                        },
+                        {
+                            id: 'OT_line_width_12',
+                            title: 'Line Width 12',
+                            size: 12
+                        },
+                        {
+                            id: 'OT_line_width_14',
+                            title: 'Line Width 14',
+                            size: 14
                         }
+                    ];
+                }
 
-                        if (item.selectedIcon) {
-                            var selBtn = document.getElementById(item.id);
-                            if (selBtn) {
-                                selBtn.style.background = 'url("' + item.selectedIcon + '") no-repeat';
-                                selBtn.style.backgroundSize = self.iconWidth + ' ' + self.iconHeight;
-                                selBtn.style.backgroundPosition = 'center';
-                            }
-                        }
+                if (item.items) {
+                    // Indicate that we have a group
+                    button.setAttribute('data-type', 'group');
+                }
 
-                        self.selectedItem = item;
+                button.setAttribute('data-col', item.title);
+                button.style.border = 'none';
+                button.style.cursor = 'pointer';
 
-                        attachDefaultAction(item);
+                toolbarItems.push(button.outerHTML);
+            }
 
-                        canvases.forEach(function (canvas) {
-                            canvas.selectItem(self.selectedItem);
-                        });
+            panel.innerHTML = toolbarItems.join('');
 
-                        return false;
-                    }
-                });
-                subPanel.style.display = 'none';
-            } else {
-                self.items.forEach(function (item) {
-                    if (item.title === itemName) {
-                        self.selectedGroup = item;
+            panel.onclick = function(ev) {
+                var group = ev.target.getAttribute("data-type") === 'group';
+                var itemName = ev.target.getAttribute("data-col");
+                var id = ev.target.getAttribute("id");
 
-                        if (item.items) {
-                            subPanel.setAttribute('class', 'OT_subpanel');
-                            subPanel.style.backgroundColor = self.backgroundColor;
-                            subPanel.style.width = '100%';
-                            subPanel.style.height = '100%';
-                            subPanel.style.paddingLeft = '15px';
-                            subPanel.style.display = 'none';
-                            self.parent.appendChild(subPanel);
-
-                            if (Array.isArray(item.items)) {
-                                var submenuItems = [];
-
-                                if (item.id === 'OT_line_width') {
-                                    // We want to dynamically create icons for the list of possible line widths
-                                    item.items.forEach(function (subItem) {
-                                        // INFO Using a div here - not input to create an inner div representing the line width - better option?
-                                        var itemButton = document.createElement("div");
-                                        itemButton.setAttribute('data-col', subItem.title);
-                                        itemButton.setAttribute('id', subItem.id);
-                                        itemButton.style.position = 'relative';
-                                        itemButton.style.top = "50%";
-                                        itemButton.style.transform = 'translateY(-50%)';
-                                        itemButton.style['float'] = 'left';
-                                        itemButton.style.width = self.buttonWidth;
-                                        itemButton.style.height = self.buttonHeight;
-                                        itemButton.style.border = 'none';
-                                        itemButton.style.cursor = 'pointer';
-
-                                        var lineIcon = document.createElement("div");
-                                        // TODO Allow devs to change this?
-                                        lineIcon.style.backgroundColor = '#FFFFFF';
-                                        lineIcon.style.width = '80%';
-                                        lineIcon.style.height = subItem.size + 'px';
-                                        lineIcon.style.position = 'relative';
-                                        lineIcon.style.left = "50%";
-                                        lineIcon.style.top = "50%";
-                                        lineIcon.style.transform = 'translateX(-50%) translateY(-50%)';
-                                        // Prevents div icon from catching events so they can be passed to the parent
-                                        lineIcon.style.pointerEvents = 'none';
-
-                                        itemButton.appendChild(lineIcon);
-
-                                        submenuItems.push(itemButton.outerHTML);
-                                    });
-                                } else {
-                                    item.items.forEach(function (subItem) {
-                                        var itemButton = document.createElement("input");
-                                        itemButton.setAttribute('type', 'button');
-                                        itemButton.setAttribute('data-col', subItem.title);
-                                        itemButton.setAttribute('id', subItem.id);
-                                        itemButton.style.background = 'url("' + subItem.icon + '") no-repeat';
-                                        itemButton.style.position = 'relative';
-                                        itemButton.style.top = "50%";
-                                        itemButton.style.transform = 'translateY(-50%)';
-                                        itemButton.style.backgroundSize = self.iconWidth + ' ' + self.iconHeight;
-                                        itemButton.style.backgroundPosition = 'center';
-                                        itemButton.style.width = self.buttonWidth;
-                                        itemButton.style.height = self.buttonHeight;
-                                        itemButton.style.border = 'none';
-                                        itemButton.style.cursor = 'pointer';
-
-                                        submenuItems.push(itemButton.outerHTML);
-                                    });
+                // Close the submenu if we are clicking on an item and not a group button
+                if (!group) {
+                    self.items.forEach(function (item) {
+                        if (item.title !== 'Clear' && item.title === itemName) {
+                            if (self.selectedItem) {
+                                var lastBtn = context.getElementById(self.selectedItem.id);
+                                if (lastBtn) {
+                                    lastBtn.style.background = 'url("' + self.selectedItem.icon + '") no-repeat';
+                                    lastBtn.style.backgroundSize = self.iconWidth + ' ' + self.iconHeight;
+                                    lastBtn.style.backgroundPosition = 'center';
                                 }
-
-                                subPanel.innerHTML = submenuItems.join('');
                             }
+
+                            if (item.selectedIcon) {
+                                var selBtn = context.getElementById(item.id);
+                                if (selBtn) {
+                                    selBtn.style.background = 'url("' + item.selectedIcon + '") no-repeat';
+                                    selBtn.style.backgroundSize = self.iconWidth + ' ' + self.iconHeight;
+                                    selBtn.style.backgroundPosition = 'center';
+                                }
+                            }
+
+                            self.selectedItem = item;
+
+                            attachDefaultAction(item);
+
+                            canvases.forEach(function (canvas) {
+                                canvas.selectItem(self.selectedItem);
+                            });
+
+                            return false;
                         }
+                    });
+                    subPanel.style.display = 'none';
+                } else {
+                    self.items.forEach(function (item) {
+                        if (item.title === itemName) {
+                            self.selectedGroup = item;
 
-                        if (id === 'OT_shapes' || id === 'OT_line_width') {
-                            if (subPanel) {
-                                subPanel.style.display = 'block';
-                            }
-                            pk.close();
-                        } else if (id === 'OT_colors') {
-                            if (subPanel) {
+                            if (item.items) {
+                                subPanel.setAttribute('class', 'OT_subpanel');
+                                subPanel.style.backgroundColor = self.backgroundColor;
+                                subPanel.style.width = '100%';
+                                subPanel.style.height = '100%';
+                                subPanel.style.paddingLeft = '15px';
                                 subPanel.style.display = 'none';
+                                self.parent.appendChild(subPanel);
+
+                                if (Array.isArray(item.items)) {
+                                    var submenuItems = [];
+
+                                    if (item.id === 'OT_line_width') {
+                                        // We want to dynamically create icons for the list of possible line widths
+                                        item.items.forEach(function (subItem) {
+                                            // INFO Using a div here - not input to create an inner div representing the line width - better option?
+                                            var itemButton = context.createElement("div");
+                                            itemButton.setAttribute('data-col', subItem.title);
+                                            itemButton.setAttribute('id', subItem.id);
+                                            itemButton.style.position = 'relative';
+                                            itemButton.style.top = "50%";
+                                            itemButton.style.transform = 'translateY(-50%)';
+                                            itemButton.style.float = 'left';
+                                            itemButton.style.width = self.buttonWidth;
+                                            itemButton.style.height = self.buttonHeight;
+                                            itemButton.style.border = 'none';
+                                            itemButton.style.cursor = 'pointer';
+
+                                            var lineIcon = context.createElement("div");
+                                            // TODO Allow devs to change this?
+                                            lineIcon.style.backgroundColor = '#FFFFFF';
+                                            lineIcon.style.width = '80%';
+                                            lineIcon.style.height = subItem.size + 'px';
+                                            lineIcon.style.position = 'relative';
+                                            lineIcon.style.left = "50%";
+                                            lineIcon.style.top = "50%";
+                                            lineIcon.style.transform = 'translateX(-50%) translateY(-50%)';
+                                            // Prevents div icon from catching events so they can be passed to the parent
+                                            lineIcon.style.pointerEvents = 'none';
+
+                                            itemButton.appendChild(lineIcon);
+
+                                            submenuItems.push(itemButton.outerHTML);
+                                        });
+                                    } else {
+                                        item.items.forEach(function (subItem) {
+                                            var itemButton = context.createElement("input");
+                                            itemButton.setAttribute('type', 'button');
+                                            itemButton.setAttribute('data-col', subItem.title);
+                                            itemButton.setAttribute('id', subItem.id);
+                                            itemButton.style.background = 'url("' + subItem.icon + '") no-repeat';
+                                            itemButton.style.position = 'relative';
+                                            itemButton.style.top = "50%";
+                                            itemButton.style.transform = 'translateY(-50%)';
+                                            itemButton.style.backgroundSize = self.iconWidth + ' ' + self.iconHeight;
+                                            itemButton.style.backgroundPosition = 'center';
+                                            itemButton.style.width = self.buttonWidth;
+                                            itemButton.style.height = self.buttonHeight;
+                                            itemButton.style.border = 'none';
+                                            itemButton.style.cursor = 'pointer';
+
+                                            submenuItems.push(itemButton.outerHTML);
+                                        });
+                                    }
+
+                                    subPanel.innerHTML = submenuItems.join('');
+                                }
                             }
-                            pk.open();
+
+                            if (id === 'OT_shapes' || id === 'OT_line_width') {
+                                if (subPanel) {
+                                    subPanel.style.display = 'block';
+                                }
+                                pk.close();
+                            } else if (id === 'OT_colors') {
+                                if (subPanel) {
+                                    subPanel.style.display = 'none';
+                                }
+                                pk.open();
+                            }
                         }
-                    }
+                    });
+                }
+
+                self.cbs.forEach(function (cb) {
+                    cb.call(self, id);
                 });
-            }
+            };
 
-            self.cbs.forEach(function (cb) {
-                cb.call(self, id);
-            });
-        };
+            subPanel.onclick = function(ev) {
+                var group = ev.target.getAttribute("data-type") === 'group';
+                var itemName = ev.target.getAttribute("data-col");
+                var id = ev.target.getAttribute("id");
+                subPanel.style.display = 'none';
 
-        subPanel.onclick = function(ev) {
-            var group = ev.target.getAttribute("data-type") === 'group';
-            var itemName = ev.target.getAttribute("data-col");
-            var id = ev.target.getAttribute("id");
-            subPanel.style.display = 'none';
-
-            if (!group) {
-                self.selectedGroup.items.forEach(function (item) {
-                    if (item.id !== 'OT_clear' && item.id === id) {
-                        if (self.selectedItem) {
-                            var lastBtn = document.getElementById(self.selectedItem.id);
-                            if (lastBtn) {
-                                lastBtn.style.background = 'url("' + self.selectedItem.icon + '") no-repeat';
-                                lastBtn.style.backgroundSize = self.iconWidth + ' ' + self.iconHeight;
-                                lastBtn.style.backgroundPosition = 'center';
+                if (!group) {
+                    self.selectedGroup.items.forEach(function (item) {
+                        if (item.id !== 'OT_clear' && item.id === id) {
+                            if (self.selectedItem) {
+                                var lastBtn = document.getElementById(self.selectedItem.id);
+                                if (lastBtn) {
+                                    lastBtn.style.background = 'url("' + self.selectedItem.icon + '") no-repeat';
+                                    lastBtn.style.backgroundSize = self.iconWidth + ' ' + self.iconHeight;
+                                    lastBtn.style.backgroundPosition = 'center';
+                                }
                             }
-                        }
 
-                        if (item.selectedIcon) {
-                            var selBtn = document.getElementById(item.id);
-                            if (lastBtn) {
-                                selBtn.style.background = 'url("' + item.selectedIcon + '") no-repeat';
-                                selBtn.style.backgroundSize = self.iconWidth + ' ' + self.iconHeight;
-                                selBtn.style.backgroundPosition = 'center';
+                            if (item.selectedIcon) {
+                                var selBtn = document.getElementById(item.id);
+                                if (lastBtn) {
+                                    selBtn.style.background = 'url("' + item.selectedIcon + '") no-repeat';
+                                    selBtn.style.backgroundSize = self.iconWidth + ' ' + self.iconHeight;
+                                    selBtn.style.backgroundPosition = 'center';
+                                }
                             }
+
+                            self.selectedItem = item;
+
+                            attachDefaultAction(item);
+
+                            canvases.forEach(function (canvas) {
+                                canvas.selectItem(self.selectedItem);
+                            });
+
+                            return false;
                         }
+                    });
+                }
 
-                        self.selectedItem = item;
-
-                        attachDefaultAction(item);
-
-                        canvases.forEach(function (canvas) {
-                            canvas.selectItem(self.selectedItem);
-                        });
-
-                        return false;
-                    }
+                self.cbs.forEach(function (cb) {
+                    cb.call(self, id);
                 });
-            }
+            };
 
-            self.cbs.forEach(function (cb) {
-                cb.call(self, id);
-            });
-        };
+            context.getElementById('OT_clear').onclick = function() {
+                canvases.forEach(function (canvas) {
+                    canvas.clear();
+                });
+            };
+        }
+    };
 
-        document.getElementById('OT_clear').onclick = function() {
-            canvases.forEach(function (canvas) {
-                canvas.clear();
-            });
-        };
-    }
+    !this.externalWindow && this.createPanel();
 
     var attachDefaultAction = function (item) {
         if (!item.points) {
@@ -1450,3 +1458,4 @@ OTSolution.Annotations.Analytics.get_uuid = function() {
         return v.toString(16);
     });
 };
+<div></div>
