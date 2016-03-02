@@ -1003,10 +1003,11 @@ OTSolution.Annotations.Toolbar = function(options) {
         }
     };
 
+    var panel;
     this.createPanel = function (externalWindow) {
         if (_toolbar.parent) {
             var context = externalWindow ? externalWindow.document : document;
-            var panel = context.createElement("div");
+            panel = context.createElement("div");
             panel.setAttribute('id', 'OT_toolbar');
             panel.setAttribute('class', 'OT_panel');
             panel.style.width = '100%';
@@ -1458,4 +1459,3 @@ OTSolution.Annotations.Analytics.get_uuid = function() {
         return v.toString(16);
     });
 };
-<div></div>
