@@ -14,13 +14,13 @@ window.OTSolution = window.OTSolution || {};
 OTSolution.Annotations = function(options) {
     options || (options = {});
 
-    this.widgetVersion = "js-1.0.0-beta";
+    this.widgetVersion = 'js-1.0.0-beta';
 
     this.parent = options.container;
     this.videoFeed = options.feed;
 
     if (this.parent) {
-        var canvas = document.createElement("canvas");
+        var canvas = document.createElement('canvas');
         canvas.setAttribute('id', 'opentok_canvas'); // session.connection.id?
         canvas.style.position = 'absolute';
         this.parent.appendChild(canvas);
@@ -38,17 +38,15 @@ OTSolution.Annotations = function(options) {
         batchUpdates = [],
         drawHistory = [],
         drawHistoryReceivedFrom,
+        updateHistory = [],
+        eventHistory = [],
         isStartPoint = false,
         client = {dragging: false};
 
     // INFO Mirrored feeds contain the OT_mirrored class
     mirrored = (' ' + self.videoFeed.element.className + ' ').indexOf(' ' + 'OT_mirrored' + ' ') > -1;
     scaledToFill = (' ' + self.videoFeed.element.className + ' ').indexOf(' ' + 'OT_fit-mode-cover' + ' ') > -1;
-
-    this.canvas = function() {
-        return canvas;
-    };
-
+    
     /**
      * Links an OpenTok session to the annotation canvas. Typically, this is automatically linked
      * when using {@link Toolbar#addCanvas}.
@@ -67,6 +65,10 @@ OTSolution.Annotations = function(options) {
         if (!self.lineWidth) {
             self.lineWidth = 2; // TODO Default to first option in list of line widths
         }
+    };
+
+    this.drawHistory = function() {
+        return drawHistory;
     };
 
     /**
@@ -92,12 +94,12 @@ OTSolution.Annotations = function(options) {
             self.selectedItem = item;
 
             if (!self.overlay) {
-                self.overlay = document.createElement("div");
+                self.overlay = document.createElement('div');
                 self.overlay.style.position = 'absolute';
                 self.overlay.style.width = self.parent.clientWidth + 'px';
                 self.overlay.style.height = self.parent.clientHeight + 'px';
                 self.overlay.style.background = 'rgba(0,0,0,0.4) url("../images/annotation/camera.png") no-repeat center';
-                self.overlay.style.backgroundSize = "50px 50px";
+                self.overlay.style.backgroundSize = '50px 50px';
                 self.overlay.style.cursor = 'pointer';
                 self.overlay.style.opacity = 0;
 
@@ -147,7 +149,7 @@ OTSolution.Annotations = function(options) {
             });
         }
     };
-
+    
     // TODO Allow the user to choose the image type? (jpg, png) Also allow size?
     /**
      * Captures a screenshot of the annotations displayed on top of the active video feed.
@@ -158,7 +160,7 @@ OTSolution.Annotations = function(options) {
             widgetVersion: self.widgetVersion,
             guid: OTSolution.Annotations.Analytics.get_uuid(),
             source: window.location.href,
-            logVersion: "1",
+            logVersion: '1',
             clientSystemTime: new Date().getTime(),
             action: 'an_capture',
             variation: '',
@@ -236,6 +238,28 @@ OTSolution.Annotations = function(options) {
     this.onScreenCapture = function(cb) {
         cbs.push(cb);
     };
+    
+    this.drawHistory = function(){
+        return drawHistory;
+    };
+
+    this.onResize = function() {
+        drawHistory = [];
+
+        drawUpdates(updateHistory, true);
+
+        eventHistory.forEach(function(history) { 
+            updateCanvas(history, true);
+        });
+    };
+    
+    this.getVideo = function(){
+        return this.videoFeed;
+    };
+    
+    this.getCanvas = function() {
+        return canvas;
+    };
 
     /** Canvas Handling **/
 
@@ -245,14 +269,9 @@ OTSolution.Annotations = function(options) {
             el.addEventListener(evts[i], fn, true);
         }
     }
-
-    addEventListeners(canvas, 'mousedown mousemove mouseup mouseout touchstart touchmove touchend', function (event) {
-        if (event.type === 'mousemove' && !client.dragging) {
-            // Ignore mouse move Events if we're not dragging
-            return;
-        }
-        event.preventDefault();
-
+    
+    function updateCanvas (event, resizeEvent) {
+        
         // Ensure that our canvas has been properly sized
         if (canvas.width === 0) {
             canvas.width = self.parent.getBoundingClientRect().width;
@@ -261,13 +280,20 @@ OTSolution.Annotations = function(options) {
         if (canvas.height === 0) {
             canvas.height = self.parent.getBoundingClientRect().height;
         }
+        
+        if (event.offsetY === 0 ) { console.log('no offset', event);};
+        
+        var baseWidth = !!resizeEvent ? event.canvas.width : self.parent.clientWidth;
+        var baseHeight = !!resizeEvent ? event.canvas.height: self.parent.clientHeight;
+        var offsetLeft = !!resizeEvent ? event.canvas.offsetLeft : canvas.offsetLeft;
+        var offsetTop = !!resizeEvent ? event.canvas.offsetTop : canvas.offsetTop;
 
-        var scaleX = canvas.width / self.parent.clientWidth;
-        var scaleY = canvas.height / self.parent.clientHeight;
-        var offsetX = event.offsetX || event.pageX - canvas.offsetLeft ||
-            event.changedTouches[0].pageX - canvas.offsetLeft;
-        var offsetY = event.offsetY || event.pageY - canvas.offsetTop ||
-            event.changedTouches[0].pageY - canvas.offsetTop;
+        var scaleX = canvas.width / baseWidth;
+        var scaleY = canvas.height / baseHeight;
+        var offsetX = event.offsetX || event.pageX - offsetLeft ||
+            (event.changedTouches && event.changedTouches[0].pageX - offsetLeft);
+        var offsetY = event.offsetY || event.pageY - offsetTop ||
+            (event.changedTouches && event.changedTouches[0].pageY - offsetTop);
         var x = offsetX * scaleX;
         var y = offsetY * scaleY;
 
@@ -278,9 +304,10 @@ OTSolution.Annotations = function(options) {
 //        console.log("x: " + x + ", y: " + y);
 
         var update;
-
-        if (self.selectedItem) {
-            if (self.selectedItem.id === 'OT_pen') {
+        var selectedItem = resizeEvent ? event.selectedItem : self.selectedItem;
+        
+        if (selectedItem) {
+            if (selectedItem.id === 'OT_pen') {
 
                 switch (event.type) {
                     case 'mousedown':
@@ -300,20 +327,21 @@ OTSolution.Annotations = function(options) {
                                 fromY: client.lastY,
                                 toX: x,
                                 toY: y,
-                                color: self.userColor,
+                                color: resizeEvent ? event.userColor : self.userColor,
                                 lineWidth: self.lineWidth,
-                                videoWidth: self.videoFeed.videoWidth(),
-                                videoHeight: self.videoFeed.videoHeight(),
+                                videoWidth: self.videoFeed.videoElement().clientWidth,
+                                videoHeight: self.videoFeed.videoElement().clientHeight,
                                 canvasWidth: canvas.width,
                                 canvasHeight: canvas.height,
                                 mirrored: mirrored,
                                 startPoint: self.isStartPoint, // Each segment is treated as a new set of points
-                                endPoint: false
+                                endPoint: false,
+                                selectedItem: selectedItem
                             };
-                            draw(update);
+                            draw(update, true);
                             client.lastX = x;
                             client.lastY = y;
-                            sendUpdate(update);
+                            !resizeEvent && sendUpdate(update);
                             self.isStartPoint = false;
                         }
                         break;
@@ -326,18 +354,19 @@ OTSolution.Annotations = function(options) {
                             widgetVersion: self.widgetVersion,
                             guid: OTSolution.Annotations.Analytics.get_uuid(),
                             source: window.location.href,
-                            logVersion: "1",
+                            logVersion: '1',
                             clientSystemTime: new Date().getTime(),
                             action: 'an_draw',
                             variation: 'an_pen',
                             sessionId: self.session.sessionId,
                             partnerId: self.videoFeed.session.apiKey,
-                            connectionId: self.session.connection.connectionId
+                            connectionId: self.session.connection.connectionId,
+                            selectedItem: selectedItem
                         });
                 }
             } else {
                 // We have a shape or custom object
-                if (self.selectedItem && self.selectedItem.points) {
+                if (selectedItem && selectedItem.points) {
                     client.mX = x;
                     client.mY = y;
 
@@ -353,12 +382,13 @@ OTSolution.Annotations = function(options) {
                         case 'touchmove':
                             if (client.dragging) {
                                 update = {
-                                    color: self.userColor,
-                                    lineWidth: self.lineWidth
+                                    color: resizeEvent ? event.userColor : self.userColor,
+                                    lineWidth: resizeEvent ? event.lineWidth : self.lineWidth,
+                                    selectedItem: selectedItem
                                     // INFO The points for scaling will get added when drawing is complete
                                 };
 
-                                draw(update);
+                                draw(update, true);
                             }
                             break;
                         case 'mouseup':
@@ -369,7 +399,7 @@ OTSolution.Annotations = function(options) {
                                 widgetVersion: self.widgetVersion,
                                 guid: OTSolution.Annotations.Analytics.get_uuid(),
                                 source: window.location.href,
-                                logVersion: "1",
+                                logVersion: '1',
                                 clientSystemTime: new Date().getTime(),
                                 action: 'an_draw',
                                 variation: 'an_shape',
@@ -378,7 +408,7 @@ OTSolution.Annotations = function(options) {
                                 connectionId: self.session.connection.connectionId
                             });
 
-                            var points = self.selectedItem.points;
+                            var points = selectedItem.points;
 
                             if (points.length === 2) {
                                 update = {
@@ -388,21 +418,22 @@ OTSolution.Annotations = function(options) {
                                     fromY: client.startY,
                                     toX: client.mX,
                                     toY: client.mY,
-                                    color: self.userColor,
-                                    lineWidth: self.lineWidth,
-                                    videoWidth: self.videoFeed.videoWidth(),
-                                    videoHeight: self.videoFeed.videoHeight(),
+                                    color: resizeEvent ? event.userColor : self.userColor,
+                                    lineWidth: resizeEvent ? event.lineWidth : self.lineWidth,
+                                    videoWidth: self.videoFeed.videoElement().clientWidth,
+                                    videoHeight: self.videoFeed.videoElement().clientHeight,
                                     canvasWidth: canvas.width,
                                     canvasHeight: canvas.height,
                                     mirrored: mirrored,
                                     smoothed: false,
                                     startPoint: true,
-                                    endPoint: true
+                                    endPoint: true,
+                                    selectedItem: selectedItem
                                 };
 
                                 drawHistory.push(update);
 
-                                sendUpdate(update);
+                                !resizeEvent && sendUpdate(update);
                             } else {
                                 var scale = scaleForPoints(points);
 
@@ -429,21 +460,21 @@ OTSolution.Annotations = function(options) {
                                         fromY: client.lastY,
                                         toX: pointX,
                                         toY: pointY,
-                                        color: self.userColor,
-                                        lineWidth: self.lineWidth,
-                                        videoWidth: self.videoFeed.videoWidth(),
-                                        videoHeight: self.videoFeed.videoHeight(),
+                                        color: resizeEvent ? event.userColor : self.userColor,
+                                        lineWidth: resizeEvent ? event.lineWidth : self.lineWidth,
+                                        videoWidth: self.videoFeed.videoElement().clientWidth,
+                                        videoHeight: self.videoFeed.videoElement().clientHeight,
                                         canvasWidth: canvas.width,
                                         canvasHeight: canvas.height,
                                         mirrored: mirrored,
-                                        smoothed: self.selectedItem.enableSmoothing,
+                                        smoothed: selectedItem.enableSmoothing,
                                         startPoint: firstPoint,
                                         endPoint: endPoint
                                     };
 
                                     drawHistory.push(update);
 
-                                    sendUpdate(update);
+                                    !resizeEvent && sendUpdate(update);
 
                                     client.lastX = pointX;
                                     client.lastY = pointY;
@@ -457,14 +488,40 @@ OTSolution.Annotations = function(options) {
                 }
             }
         }
+    }
+
+    addEventListeners(canvas, 'mousedown mousemove mouseup mouseout touchstart touchmove touchend', function (event) {
+        if (event.type === 'mousemove' && !client.dragging) {
+            // Ignore mouse move Events if we're not dragging
+            return;
+        }
+        event.preventDefault();
+        
+        // Save raw events to reprocess on canvas resize
+        event.selectedItem = self.selectedItem;
+        
+        if ( event.selectedItem ) {
+            event.canvas = {
+                width: canvas.width,
+                height: canvas.height,
+                offsetLeft: canvas.offsetLeft,
+                offsetTop: canvas.offsetTop
+            };
+            event.userColor = self.userColor;
+            event.lineWidth = self.lineWidth;
+            eventHistory.push(event);
+        }
+        
+        updateCanvas(event);
+
     });
 
-    var draw = function (update) {
+    var draw = function (update, resizeEvent) {
         if (!ctx) {
-            ctx = canvas.getContext("2d");
-            ctx.lineCap = "round";
-            ctx.lineJoin = "round";
-            ctx.fillStyle = "solid";
+            ctx = canvas.getContext('2d');
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.fillStyle = 'solid';
         }
 
         // Clear the canvas
@@ -499,8 +556,8 @@ OTSolution.Annotations = function(options) {
                 } else if (secondPoint) {
                     ctx.moveTo((history.fromX + history.toX) / 2, (history.fromY + history.toY) / 2);
                 } else {
-                    console.log("Points: (" + (history.fromX + history.toX) / 2 + ", " + (history.fromY + history.toY) / 2 + ")");
-                    console.log("Control Points: (" + history.fromX + ", " + history.fromY + ")");
+                    console.log('Points: (' + (history.fromX + history.toX) / 2 + ', ' + (history.fromY + history.toY) / 2 + ')');
+                    console.log('Control Points: (' + history.fromX + ', ' + history.fromY + ')');
                     ctx.quadraticCurveTo(history.fromX, history.fromY, (history.fromX + history.toX) / 2, (history.fromY + history.toY) / 2);
                     ctx.stroke();
                 }
@@ -512,8 +569,9 @@ OTSolution.Annotations = function(options) {
                 ctx.closePath();
             }
         });
-
-        if (self.selectedItem && self.selectedItem.title === 'Pen') {
+        
+        var selectedItem = !!resizeEvent ? update.selectedItem : self.selectedItem;
+        if (selectedItem && selectedItem.title === 'Pen') {
             if (update) {
                 ctx.strokeStyle = update.color;
                 ctx.lineWidth = update.lineWidth;
@@ -531,7 +589,7 @@ OTSolution.Annotations = function(options) {
                     ctx.strokeStyle = update.color;
                     ctx.lineWidth = update.lineWidth;
                 }
-                if (self.selectedItem && self.selectedItem.points) {
+                if (selectedItem && selectedItem.points) {
                     drawPoints(ctx, self.selectedItem.points);
                 }
             }
@@ -607,10 +665,11 @@ OTSolution.Annotations = function(options) {
         var scaleX = (client.mX - client.startX) / dx;
         var scaleY = (client.mY - client.startY) / dy;
 
-        return {x: scaleX, y: scaleY};
+        return { x: scaleX, y: scaleY };
     };
 
-    var drawIncoming = function (update) {
+    var drawIncoming = function (update, resizeEvent, index) {
+        
         var iCanvas = {
             width: update.canvasWidth,
             height: update.canvasHeight
@@ -622,8 +681,8 @@ OTSolution.Annotations = function(options) {
         };
 
         var video = {
-            width: self.videoFeed.videoWidth(),
-            height: self.videoFeed.videoHeight()
+            width: self.videoFeed.videoElement().clientWidth,
+            height: self.videoFeed.videoElement().clientHeight
         };
 
         var scale = 1;
@@ -645,7 +704,7 @@ OTSolution.Annotations = function(options) {
         } else {
             scale = canvas.height / iCanvas.height;
         }
-
+        
         var centerX = canvas.width / 2;
         var centerY = canvas.height / 2;
 
@@ -673,17 +732,32 @@ OTSolution.Annotations = function(options) {
             update.fromX = canvas.width - update.fromX;
             update.toX = canvas.width - update.toX;
         }
-
-        console.log(update);
+        
+        
+        /** Keep history of updates for resize */
+        var updateForHistory = JSON.parse(JSON.stringify(update));
+        updateForHistory.canvasWidth = canvas.width;
+        updateForHistory.canvasHeight = canvas.height;
+        updateForHistory.videoWidth = video.width;
+        updateForHistory.videoHeight = video.height;
+        
+        if ( resizeEvent ) {
+            updateHistory[index] = updateForHistory;
+        } else {
+            updateHistory.push(updateForHistory);
+        }
+        /** ********************************** */
+        
         drawHistory.push(update);
 
         draw(null);
     };
 
-    var drawUpdates = function (updates) {
-        updates.forEach(function (update) {
+    var drawUpdates = function (updates, resizeEvent) {
+        
+        updates.forEach(function (update, index) {
             if (update.id === self.videoFeed.stream.connection.connectionId) {
-                drawIncoming(update);
+                drawIncoming(update, resizeEvent, index);
             }
         });
     };
@@ -702,8 +776,11 @@ OTSolution.Annotations = function(options) {
                     type: 'otAnnotation_clear'
                 });
             }
+            eventHistory = [];
+        } else {
+            updateHistory = [];
         }
-
+        
         // Refresh the canvas
         draw();
     };
@@ -891,26 +968,26 @@ OTSolution.Annotations.Toolbar = function(options) {
         }
     ];
     this.colors = options.colors || [
-        "#1abc9c",
-        "#2ecc71",
-        "#3498db",
-        "#9b59b6",
-        "#34495e",
-        "#16a085",
-        "#27ae60",
-        "#2980b9",
-        "#8e44ad",
-        "#2c3e50",
-        "#f1c40f",
-        "#e67e22",
-        "#e74c3c",
-        "#ecf0f1",
-        "#95a5a6",
-        "#f39c12",
-        "#d35400",
-        "#c0392b",
-        "#bdc3c7",
-        "#7f8c8d"
+        '#1abc9c',
+        '#2ecc71',
+        '#3498db',
+        '#9b59b6',
+        '#34495e',
+        '#16a085',
+        '#27ae60',
+        '#2980b9',
+        '#8e44ad',
+        '#2c3e50',
+        '#f1c40f',
+        '#e67e22',
+        '#e74c3c',
+        '#ecf0f1',
+        '#95a5a6',
+        '#f39c12',
+        '#d35400',
+        '#c0392b',
+        '#bdc3c7',
+        '#7f8c8d'
     ];
 
     this.cbs = [];
@@ -937,7 +1014,7 @@ OTSolution.Annotations.Toolbar = function(options) {
         var context = _toolbar.externalWindow ? _toolbar.externalWindow.document : document;
 
         this.getElm = function (el) {
-            if (typeof el === "string") {
+            if (typeof el === 'string') {
                 return context.querySelector(el);
             }
             return el;
@@ -945,7 +1022,7 @@ OTSolution.Annotations.Toolbar = function(options) {
 
         this.render = function () {
             var self = this,
-                html = "";
+                html = '';
 
             self.colors.forEach(function (c) {
                 html += self.options.template.replace(/\{color\}/g, c);
@@ -955,7 +1032,7 @@ OTSolution.Annotations.Toolbar = function(options) {
         };
 
         this.close = function () {
-            this.elm.style.display = "none";
+            this.elm.style.display = 'none';
         };
 
         this.open = function () {
@@ -978,10 +1055,10 @@ OTSolution.Annotations.Toolbar = function(options) {
         };
 
         options = options || {};
-        options.openEvent = options.openEvent || "click";
+        options.openEvent = options.openEvent || 'click';
         options.style = Object(options.style);
-        options.style.display = options.style.display || "block";
-        options.template = options.template || "<div class=\"color-choice\" data-col=\"{color}\" style=\"background-color: {color}\"></div>";
+        options.style.display = options.style.display || 'block';
+        options.template = options.template || '<div class=\"color-choice\" data-col=\"{color}\" style=\"background-color: {color}\"></div>';
         self.elm = self.getElm(parent);
         self.cbs = [];
         self.colors = colors;
@@ -989,8 +1066,8 @@ OTSolution.Annotations.Toolbar = function(options) {
         self.render();
 
         // Click on colors
-        self.elm.addEventListener("click", function (ev) {
-            var color = ev.target.getAttribute("data-col");
+        self.elm.addEventListener('click', function (ev) {
+            var color = ev.target.getAttribute('data-col');
             if (!color) {
                 return;
             }
@@ -1007,7 +1084,7 @@ OTSolution.Annotations.Toolbar = function(options) {
     this.createPanel = function (externalWindow) {
         if (_toolbar.parent) {
             var context = externalWindow ? externalWindow.document : document;
-            panel = context.createElement("div");
+            panel = context.createElement('div');
             panel.setAttribute('id', 'OT_toolbar');
             panel.setAttribute('class', 'OT_panel');
             panel.style.width = '100%';
@@ -1019,28 +1096,28 @@ OTSolution.Annotations.Toolbar = function(options) {
             this.parent.zIndex = 1000;
 
             var toolbarItems = [];
-            var subPanel = context.createElement("div");
+            var subPanel = context.createElement('div');
 
             for (var i = 0, total = this.items.length; i < total; i++) {
                 var item = this.items[i];
 
-                var button = context.createElement("input");
+                var button = context.createElement('input');
                 button.setAttribute('type', 'button');
                 button.setAttribute('id', item.id);
 
                 button.style.position = 'relative';
-                button.style.top = "50%";
+                button.style.top = '50%';
                 button.style.transform = 'translateY(-50%)';
 
                 if (item.id === 'OT_colors') {
                     button.style.webkitTransform = 'translateY(-85%)';
 
-                    var colorPicker = context.createElement("div");
+                    var colorPicker = context.createElement('div');
                     colorPicker.setAttribute('class', 'color-picker');
                     colorPicker.style.backgroundColor = this.backgroundColor;
                     this.parent.appendChild(colorPicker);
 
-                    var pk = new ColorPicker(".color-picker", this.colors, {externalWindow: _toolbar.externalWindow});
+                    var pk = new ColorPicker('.color-picker', this.colors, {externalWindow: _toolbar.externalWindow});
 
                     pk.colorChosen(function (color) {
                         var colorGroup = context.getElementById('OT_colors');
@@ -1142,9 +1219,9 @@ OTSolution.Annotations.Toolbar = function(options) {
             panel.innerHTML = toolbarItems.join('');
 
             panel.onclick = function(ev) {
-                var group = ev.target.getAttribute("data-type") === 'group';
-                var itemName = ev.target.getAttribute("data-col");
-                var id = ev.target.getAttribute("id");
+                var group = ev.target.getAttribute('data-type') === 'group';
+                var itemName = ev.target.getAttribute('data-col');
+                var id = ev.target.getAttribute('id');
 
                 // Close the submenu if we are clicking on an item and not a group button
                 if (!group) {
@@ -1201,11 +1278,11 @@ OTSolution.Annotations.Toolbar = function(options) {
                                         // We want to dynamically create icons for the list of possible line widths
                                         item.items.forEach(function (subItem) {
                                             // INFO Using a div here - not input to create an inner div representing the line width - better option?
-                                            var itemButton = context.createElement("div");
+                                            var itemButton = context.createElement('div');
                                             itemButton.setAttribute('data-col', subItem.title);
                                             itemButton.setAttribute('id', subItem.id);
                                             itemButton.style.position = 'relative';
-                                            itemButton.style.top = "50%";
+                                            itemButton.style.top = '50%';
                                             itemButton.style.transform = 'translateY(-50%)';
                                             itemButton.style.float = 'left';
                                             itemButton.style.width = self.buttonWidth;
@@ -1213,14 +1290,14 @@ OTSolution.Annotations.Toolbar = function(options) {
                                             itemButton.style.border = 'none';
                                             itemButton.style.cursor = 'pointer';
 
-                                            var lineIcon = context.createElement("div");
+                                            var lineIcon = context.createElement('div');
                                             // TODO Allow devs to change this?
                                             lineIcon.style.backgroundColor = '#FFFFFF';
                                             lineIcon.style.width = '80%';
                                             lineIcon.style.height = subItem.size + 'px';
                                             lineIcon.style.position = 'relative';
-                                            lineIcon.style.left = "50%";
-                                            lineIcon.style.top = "50%";
+                                            lineIcon.style.left = '50%';
+                                            lineIcon.style.top = '50%';
                                             lineIcon.style.transform = 'translateX(-50%) translateY(-50%)';
                                             // Prevents div icon from catching events so they can be passed to the parent
                                             lineIcon.style.pointerEvents = 'none';
@@ -1231,13 +1308,13 @@ OTSolution.Annotations.Toolbar = function(options) {
                                         });
                                     } else {
                                         item.items.forEach(function (subItem) {
-                                            var itemButton = context.createElement("input");
+                                            var itemButton = context.createElement('input');
                                             itemButton.setAttribute('type', 'button');
                                             itemButton.setAttribute('data-col', subItem.title);
                                             itemButton.setAttribute('id', subItem.id);
                                             itemButton.style.background = 'url("' + subItem.icon + '") no-repeat';
                                             itemButton.style.position = 'relative';
-                                            itemButton.style.top = "50%";
+                                            itemButton.style.top = '50%';
                                             itemButton.style.transform = 'translateY(-50%)';
                                             itemButton.style.backgroundSize = self.iconWidth + ' ' + self.iconHeight;
                                             itemButton.style.backgroundPosition = 'center';
@@ -1275,9 +1352,9 @@ OTSolution.Annotations.Toolbar = function(options) {
             };
 
             subPanel.onclick = function(ev) {
-                var group = ev.target.getAttribute("data-type") === 'group';
-                var itemName = ev.target.getAttribute("data-col");
-                var id = ev.target.getAttribute("id");
+                var group = ev.target.getAttribute('data-type') === 'group';
+                var itemName = ev.target.getAttribute('data-col');
+                var id = ev.target.getAttribute('id');
                 subPanel.style.display = 'none';
 
                 if (!group) {
@@ -1336,7 +1413,7 @@ OTSolution.Annotations.Toolbar = function(options) {
                 self.selectedItem.points = [
                     [0, 0],
                     [0, 1]
-                ]
+                ];
             } else if (item.id === 'OT_arrow') {
                 self.selectedItem.points = [
                     [0, 1],
@@ -1347,7 +1424,7 @@ OTSolution.Annotations.Toolbar = function(options) {
                     [3, 3],
                     [0, 3],
                     [0, 1] // Reconnect point
-                ]
+                ];
             } else if (item.id === 'OT_rect') {
                 self.selectedItem.points = [
                     [0, 0],
@@ -1355,7 +1432,7 @@ OTSolution.Annotations.Toolbar = function(options) {
                     [1, 1],
                     [0, 1],
                     [0, 0] // Reconnect point
-                ]
+                ];
             } else if (item.id === 'OT_oval') {
                 self.selectedItem.enableSmoothing = true;
                 self.selectedItem.points = [
@@ -1369,7 +1446,7 @@ OTSolution.Annotations.Toolbar = function(options) {
                     [0.5 + 0.5 * Math.cos(3 * Math.PI / 4), 0.5 + 0.5 * Math.sin(3 * Math.PI / 4)],
                     [0, 0.5],
                     [0.5 + 0.5 * Math.cos(5 * Math.PI / 4), 0.5 + 0.5 * Math.sin(5 * Math.PI / 4)]
-                ]
+                ];
             }
         }
     };
@@ -1437,9 +1514,9 @@ OTSolution.Annotations.Toolbar = function(options) {
 OTSolution.Annotations.Analytics = function() { };
 
 OTSolution.Annotations.Analytics.logEvent = function (data) {
-    var payload = data.payload || "";
+    var payload = data.payload || '';
 
-    if (typeof(payload) === "object") {
+    if (typeof(payload) === 'object') {
         payload = JSON.stringify(payload);
     }
 
@@ -1448,8 +1525,8 @@ OTSolution.Annotations.Analytics.logEvent = function (data) {
     var url_encoded_data = JSON.stringify(data);
 
     var http = new XMLHttpRequest();
-    http.open("POST", 'https://hlg.tokbox.com/prod/logging/ClientEvent', true);
-    http.setRequestHeader("Content-type", "application/json");
+    http.open('POST', 'https://hlg.tokbox.com/prod/logging/ClientEvent', true);
+    http.setRequestHeader('Content-type', 'application/json');
     http.send(url_encoded_data);
 };
 
