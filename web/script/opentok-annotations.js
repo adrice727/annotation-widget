@@ -46,6 +46,10 @@ OTSolution.Annotations = function(options) {
     // INFO Mirrored feeds contain the OT_mirrored class
     mirrored = (' ' + self.videoFeed.element.className + ' ').indexOf(' ' + 'OT_mirrored' + ' ') > -1;
     scaledToFill = (' ' + self.videoFeed.element.className + ' ').indexOf(' ' + 'OT_fit-mode-cover' + ' ') > -1;
+
+    this.canvas = function() {
+        return canvas;
+    };
     
     /**
      * Links an OpenTok session to the annotation canvas. Typically, this is automatically linked
