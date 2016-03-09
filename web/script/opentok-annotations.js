@@ -243,10 +243,6 @@ OTSolution.Annotations = function(options) {
         cbs.push(cb);
     };
     
-    this.drawHistory = function(){
-        return drawHistory;
-    };
-
     this.onResize = function() {
         drawHistory = [];
 
@@ -257,14 +253,6 @@ OTSolution.Annotations = function(options) {
         });
     };
     
-    this.getVideo = function(){
-        return this.videoFeed;
-    };
-    
-    this.getCanvas = function() {
-        return canvas;
-    };
-
     /** Canvas Handling **/
 
     function addEventListeners(el, s, fn) {
@@ -1288,7 +1276,7 @@ OTSolution.Annotations.Toolbar = function(options) {
                                             itemButton.style.position = 'relative';
                                             itemButton.style.top = '50%';
                                             itemButton.style.transform = 'translateY(-50%)';
-                                            itemButton.style.float = 'left';
+                                            itemButton.style['float'] = 'left';
                                             itemButton.style.width = self.buttonWidth;
                                             itemButton.style.height = self.buttonHeight;
                                             itemButton.style.border = 'none';
