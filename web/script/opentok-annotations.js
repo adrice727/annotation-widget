@@ -71,10 +71,6 @@ OTSolution.Annotations = function(options) {
         }
     };
 
-    this.drawHistory = function() {
-        return drawHistory;
-    };
-
     /**
      * Changes the line/stroke width of the active annotation for the canvas.
      * @param size The size in pixels.
