@@ -1,149 +1,144 @@
 <!DOCTYPE html>
 <html lang="en" ng-app="demo">
+
 <head>
-<meta http-equiv="Content-type" content="text/html; charset=utf-8">
-<title>OpenTok Annotations Screensharing Demo</title>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+    <title>OpenTok Annotations Screensharing Demo</title>
 
-<script src='//static.opentok.com/webrtc/v2.2/js/opentok.min.js'></script>
-<script src="script/opentok-annotations.js" type="text/javascript" charset="utf-8"></script>
+    <script src='//static.opentok.com/webrtc/v2.2/js/opentok.min.js'></script>
+    <script src="script/opentok-annotations.js" type="text/javascript" charset="utf-8"></script>
 
-<script type="text/javascript" charset="utf-8">
+    <script type="text/javascript" charset="utf-8">
+        var toolbar;
+        var session;
+        var apiKey;
+        var sessionId;
+        var token;
+        var foo = 'bar';
 
-var toolbar;
-var session;
-var apiKey;
-var sessionId;
-var token;
-
-if (!toolbar) {
-    alert('Something went wrong: You must pass an OpenTok annotation toolbar object into the window.')
-} else {
-    // Create a new session for this window
-    var xmlHttp = new XMLHttpRequest();
-    xmlHttp.onreadystatechange = function() {
-        if (xmlHttp.readyState == 4 && xmlHttp.status == 200) {
-            var res = JSON.parse(xmlHttp.responseText);
-
-            apiKey = res.key;
-            sessionId = res.sessionId;
-            token = res.token;
-
-            session = TB.initSession(apiKey, sessionId);
-            session.connect(token);
-
-            // Listeners so we know when to close the window
-            session.addEventListener('sessionDisconnected', sessionDisconnectedHandler);
-            session.addEventListener('connectionDestroyed', connectionDestroyedHandler);
-        }
-    };
-    xmlHttp.open( "GET", "config.php", true );
-    xmlHttp.send( null );
-}
-
-function connectionDestroyedHandler(event) {
-    // This signals that connections were destroyed
-
-    window.opener = self;
-    window.close();
-}
-
-function sessionDisconnectedHandler(event) {
-    // This signals that the user was disconnected from the Session. Any subscribers and publishers
-    // will automatically be removed. This default behaviour can be prevented using event.preventDefault()
-
-    window.opener = self;
-    window.close();
-}
-
-if (OT.$.browser() == 'Chrome') {
-    OT.registerScreenSharingExtension('chrome', '{insert chrome extension id here}', 2);
-}
-
-OT.checkScreenSharingCapability(function(response) {
-    if (location.protocol == "http:"){
-        alert('Screen sharing is only available over HTTPS.');
-    } else if (!response.supported) {
-        alert('This browser does not support screen sharing.');
-    } else if (response.extensionRegistered === false) {
-        alert('Please register the extension with OpenTok using "OT.registerScreenSharingExtension(...)".');
-    } else {
-        if (OT.$.browser() == 'Chrome' && response.extensionInstalled === false) {
-            // extensionInstalled is always undefined in browsers other than Chrome
-            alert('Please install the screen sharing extension and load this page over HTTPS.');
+        if (!toolbar) {
+            alert('Something went wrong: You must pass an OpenTok annotation toolbar object into the window.')
         } else {
-            // Screen sharing is available. Publish the screen.
-            startSharing();
+            opener = window.opener;
+            opener.onbeforeunload = function() {
+                window.close();
+            };
+            // // Create a new session for this window
+            // var xmlHttp = new XMLHttpRequest();
+            // xmlHttp.onreadystatechange = function() {
+            //     if (xmlHttp.readyState == 4 && xmlHttp.status == 200) {
+            //         var res = JSON.parse(xmlHttp.responseText);
+            //
+            //         apiKey = res.key;
+            //         sessionId = res.sessionId;
+            //         token = res.token;
+            //
+            //         session = TB.initSession(apiKey, sessionId);
+            //         session.connect(token);
+            //
+            //         // Listeners so we know when to close the window
+            //         session.addEventListener('sessionDisconnected', sessionDisconnectedHandler);
+            //         session.addEventListener('connectionDestroyed', connectionDestroyedHandler);
+            //     }
+            // };
+            // xmlHttp.open( "GET", "config.json", true );
+            // xmlHttp.send( null );
         }
-    }
-});
 
-function startSharing() {
-    console.log("Sharing screen");
-    var parentDiv = document.getElementById('screenshareContainer');
-    var screenContainerElement = document.createElement('div');
-    screenContainerElement.setAttribute('id', 'screenshare_publisher');
-    parentDiv.appendChild(screenContainerElement);
+        function createContainerElements() {
 
-    var screenSharingPublisher = OT.initPublisher(
-            screenContainerElement.id,
-            {
-                videoSource: 'screen',
-                width: window.innerWidth,
-                height: window.innerHeight
-            },
-            function (error) {
-                if (error) {
-                    alert('Something went wrong: ' + error.message);
-                } else {
-                    // Add the toolbar
-                    var toolbarDiv = toolbar.parent;
-                    toolbarDiv.style.position = 'absolute';
-                    toolbarDiv.style.top = '0px';
+            var parentDiv = document.getElementById('screenshareContainer');
+            var publisherContainer = document.createElement('div');
+            publisherContainer.setAttribute('id', 'screenshare_publisher');
+            publisherContainer.classList.add('publisher-wrap');
+            parentDiv.appendChild(publisherContainer);
 
-                    document.body.appendChild(toolbarDiv);
+            return {
+                annotation: parentDiv,
+                publisher: publisherContainer
+            };
+        }
 
-                    console.log(session);
+        // function startSharing() {
+        //     console.log("Sharing screen");
+        //     var parentDiv = document.getElementById('screenshareContainer');
+        //     var screenContainerElement = document.createElement('div');
+        //     screenContainerElement.setAttribute('id', 'screenshare_publisher');
+        //     parentDiv.appendChild(screenContainerElement);
+        //
+        //     var screenSharingPublisher = OT.initPublisher(
+        //             screenContainerElement.id,
+        //             {
+        //                 videoSource: 'screen',
+        //                 width: window.innerWidth,
+        //                 height: window.innerHeight
+        //             },
+        //             function (error) {
+        //                 if (error) {
+        //                     alert('Something went wrong: ' + error.message);
+        //                 } else {
+        //                     // Add the toolbar
+        //                     var toolbarDiv = toolbar.parent;
+        //                     toolbarDiv.style.position = 'absolute';
+        //                     toolbarDiv.style.top = '0px';
+        //
+        //                     document.body.appendChild(toolbarDiv);
+        //
+        //                     console.log(session);
+        //
+        //                     session.publish(
+        //                             screenSharingPublisher,
+        //                             function (error) {
+        //                                 if (error) {
+        //                                     alert('Something went wrong: ' + error.message);
+        //                                 }
+        //                             });
+        //
+        //                     var canvas = new OTSolution.Annotations({
+        //                         feed: screenSharingPublisher,
+        //                         container: screenContainerElement
+        //                     });
+        //                     toolbar.addCanvas(canvas);
+        //
+        //                 }
+        //             });
+        // }
+    </script>
 
-                    session.publish(
-                            screenSharingPublisher,
-                            function (error) {
-                                if (error) {
-                                    alert('Something went wrong: ' + error.message);
-                                }
-                            });
+    <style type="text/css" media="screen">
+        body {
+            margin: 0;
+            padding: 0;
+        }
 
-                    var canvas = new OTSolution.Annotations({
-                        feed: screenSharingPublisher,
-                        container: screenContainerElement
-                    });
-                    toolbar.addCanvas(canvas);
-                }
-            });
-}
+        #toolbar {
+            position: absolute !important;
+            top: 20px;
+            left: 0;
+            z-index: 1001;
+        }
 
-</script>
+        #screenshare_publisher {
+            display: block;
+            background-color: #000000;
+            position: absolute;
+        }
 
-<style type="text/css" media="screen">
-    body {
-        margin: 0;
-        padding: 0;
-    }
-    #toolbar {
-        position:absolute;
-        top:0;
-        left:0;
-    }
-    .publisherContainer {
-        display: block;
-        background-color: #000000;
-        position: absolute;
-    }
-    #OT_toolbar {
-        padding-left: 15px;
-    }
-</style>
+        #OT_toolbar {
+            padding-left: 15px;
+        }
+
+        #opentok_canvas {
+            position: absolute;
+            top: 0;
+            z-index: 1000;
+        }
+    </style>
 </head>
+
 <body>
-<div id="screenshareContainer" style="height:600px;width:100%"></div>
+    <div id="screenshareContainer" style="width:800px;height:600px"></div>
+    <div id="toolbar"></div>
 </body>
+
 </html>

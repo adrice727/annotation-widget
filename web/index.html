@@ -1,386 +1,448 @@
 <!DOCTYPE html>
 <html lang="en" ng-app="demo">
+
 <head>
-<meta http-equiv="Content-type" content="text/html; charset=utf-8">
-<title>OpenTok Annotations Demo</title>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+    <title>OpenTok Annotations Demo</title>
 
-<script src='//static.opentok.com/webrtc/v2.2/js/opentok.min.js'></script>
-<script src="script/opentok-annotations.js" type="text/javascript" charset="utf-8"></script>
+    <script src='//static.opentok.com/webrtc/v2.2/js/opentok.min.js'></script>
+    <script src="script/opentok-annotations.js" type="text/javascript" charset="utf-8"></script>
 
-<script type="text/javascript" charset="utf-8">
+    <script type="text/javascript" charset="utf-8">
+        var apiKey;
+        var sessionId;
+        var token;
+        var screenshare;
+        var screenshareWindow;
 
-var apiKey;
-var sessionId;
-var token;
+        var toolbar;
+        var session;
+        var publisher;
+        var subscribers = {};
 
-var toolbar;
-var session;
-var publisher;
-var subscribers = {};
+        // Un-comment either of the following to set automatic logging and exception handling.
+        // See the exceptionHandler() method below.
+        // TB.setLogLevel(TB.DEBUG);
+        // TB.addEventListener('exception', exceptionHandler);
 
-// Un-comment either of the following to set automatic logging and exception handling.
-// See the exceptionHandler() method below.
-// TB.setLogLevel(TB.DEBUG);
-// TB.addEventListener('exception', exceptionHandler);
+        var palette = [
+            "#1abc9c",
+            "#2ecc71",
+            "#3498db",
+            "#9b59b6",
+            "#34495e",
+            "#16a085",
+            "#27ae60",
+            "#2980b9",
+            "#8e44ad",
+            "#2c3e50",
+            "#f1c40f",
+            "#e67e22",
+            "#e74c3c",
+            "#ecf0f1",
+            "#95a5a6",
+            "#f39c12",
+            "#d35400",
+            "#c0392b",
+            "#bdc3c7",
+            "#7f8c8d"
+        ];
 
-var palette = [
-    "#1abc9c",
-    "#2ecc71",
-    "#3498db",
-    "#9b59b6",
-    "#34495e",
-    "#16a085",
-    "#27ae60",
-    "#2980b9",
-    "#8e44ad",
-    "#2c3e50",
-    "#f1c40f",
-    "#e67e22",
-    "#e74c3c",
-    "#ecf0f1",
-    "#95a5a6",
-    "#f39c12",
-    "#d35400",
-    "#c0392b",
-    "#bdc3c7",
-    "#7f8c8d"
-];
+        //--------------------------------------
+        //  LINK CLICK HANDLERS
+        //--------------------------------------
 
-//--------------------------------------
-//  LINK CLICK HANDLERS
-//--------------------------------------
+        function connect() {
+            // Make an HTTP request to get the OpenTok API key, session ID, and token from the server
+            var xmlHttp = new XMLHttpRequest();
+            xmlHttp.onreadystatechange = function() {
+                if (xmlHttp.readyState == 4 && xmlHttp.status == 200) {
+                    var res = JSON.parse(xmlHttp.responseText);
 
-function connect() {
-    // Make an HTTP request to get the OpenTok API key, session ID, and token from the server
-    var xmlHttp = new XMLHttpRequest();
-    xmlHttp.onreadystatechange = function() {
-        if (xmlHttp.readyState == 4 && xmlHttp.status == 200) {
-            var res = JSON.parse(xmlHttp.responseText);
+                    apiKey = res.key;
+                    sessionId = res.sessionId;
+                    token = res.token;
+                    screenshare = res.screenshare;
 
-            apiKey = res.key;
-            sessionId = res.sessionId;
-            token = res.token;
+                    session = TB.initSession(apiKey, sessionId); // Initialize session
 
-            session = TB.initSession(apiKey, sessionId);	// Initialize session
+                    // Add event listeners to the session
+                    session.addEventListener('sessionConnected', sessionConnectedHandler);
+                    session.addEventListener('sessionDisconnected', sessionDisconnectedHandler);
+                    session.addEventListener('connectionCreated', connectionCreatedHandler);
+                    session.addEventListener('connectionDestroyed', connectionDestroyedHandler);
+                    session.addEventListener('streamCreated', streamCreatedHandler);
+                    session.addEventListener('streamDestroyed', streamDestroyedHandler);
+                    session.addEventListener('signal', signalHandler);
 
-            // Add event listeners to the session
-            session.addEventListener('sessionConnected', sessionConnectedHandler);
-            session.addEventListener('sessionDisconnected', sessionDisconnectedHandler);
-            session.addEventListener('connectionCreated', connectionCreatedHandler);
-            session.addEventListener('connectionDestroyed', connectionDestroyedHandler);
-            session.addEventListener('streamCreated', streamCreatedHandler);
-            session.addEventListener('streamDestroyed', streamDestroyedHandler);
-            session.addEventListener('signal', signalHandler);
+                    session.connect(token);
 
-            session.connect(token);
+                    createToolbar();
 
-            // Initialize a toolbar for controlling annotation canvases
+                }
+            };
+            xmlHttp.open("GET", "config.json", true);
+            xmlHttp.send(null);
+        }
+
+        // Initialize a toolbar for controlling annotation canvases
+        function createToolbar(externalWindow) {
+
+            var context = externalWindow ? externalWindow.document : window.document;
+
             toolbar = new OTSolution.Annotations.Toolbar({
                 session: session,
-                container: document.getElementById('toolbar'),
+                container: context.getElementById('toolbar'),
                 colors: palette,
-                items: [
-                    {
-                        id: 'OT_pen',
-                        title: 'Pen',
-                        icon: 'image/freehand.png',
-                        selectedIcon: 'image/freehand_selected.png'
-                    },
-                    {
-                        id: 'OT_line',
-                        title: 'Line',
-                        icon: 'image/line.png',
-                        selectedIcon: 'image/line_selected.png'
-                    },
-                    {
-                        id: 'OT_shapes',
-                        title: 'Shapes',
-                        icon: 'image/shapes.png',
-                        items: [
-                            {
-                                id: 'OT_arrow',
-                                title: 'Arrow',
-                                icon: 'image/arrow.png'
-                            },
-                            {
-                                id: 'OT_rect',
-                                title: 'Rectangle',
-                                icon: 'image/rectangle.png'
-                            },
-                            {
-                                id: 'OT_oval',
-                                title: 'Oval',
-                                icon: 'image/oval.png'
-                            },
-                            {
-                                id: 'OT_star',
-                                title: 'Star',
-                                icon: 'image/star.png',
-                                points: [
-                                    [0.5 + 0.5 * Math.cos(90 * (Math.PI / 180)), 0.5 + 0.5 * Math.sin(90 * (Math.PI / 180))],
-                                    [0.5 + 0.25 * Math.cos(126 * (Math.PI / 180)), 0.5 + 0.25 * Math.sin(126 * (Math.PI / 180))],
-                                    [0.5 + 0.5 * Math.cos(162 * (Math.PI / 180)), 0.5 + 0.5 * Math.sin(162 * (Math.PI / 180))],
-                                    [0.5 + 0.25 * Math.cos(198 * (Math.PI / 180)), 0.5 + 0.25 * Math.sin(198 * (Math.PI / 180))],
-                                    [0.5 + 0.5 * Math.cos(234 * (Math.PI / 180)), 0.5 + 0.5 * Math.sin(234 * (Math.PI / 180))],
-                                    [0.5 + 0.25 * Math.cos(270 * (Math.PI / 180)), 0.5 + 0.25 * Math.sin(270 * (Math.PI / 180))],
-                                    [0.5 + 0.5 * Math.cos(306 * (Math.PI / 180)), 0.5 + 0.5 * Math.sin(306 * (Math.PI / 180))],
-                                    [0.5 + 0.25 * Math.cos(342 * (Math.PI / 180)), 0.5 + 0.25 * Math.sin(342 * (Math.PI / 180))],
-                                    [0.5 + 0.5 * Math.cos(18 * (Math.PI / 180)), 0.5 + 0.5 * Math.sin(18 * (Math.PI / 180))],
-                                    [0.5 + 0.25 * Math.cos(54 * (Math.PI / 180)), 0.5 + 0.25 * Math.sin(54 * (Math.PI / 180))],
-                                    [0.5 + 0.5 * Math.cos(90 * (Math.PI / 180)), 0.5 + 0.5 * Math.sin(90 * (Math.PI / 180))]
-                                ]
-                            }
+                items: [{
+                    id: 'OT_pen',
+                    title: 'Pen',
+                    icon: 'image/freehand.png',
+                    selectedIcon: 'image/freehand_selected.png'
+                }, {
+                    id: 'OT_line',
+                    title: 'Line',
+                    icon: 'image/line.png',
+                    selectedIcon: 'image/line_selected.png'
+                }, {
+                    id: 'OT_shapes',
+                    title: 'Shapes',
+                    icon: 'image/shapes.png',
+                    items: [{
+                        id: 'OT_arrow',
+                        title: 'Arrow',
+                        icon: 'image/arrow.png'
+                    }, {
+                        id: 'OT_rect',
+                        title: 'Rectangle',
+                        icon: 'image/rectangle.png'
+                    }, {
+                        id: 'OT_oval',
+                        title: 'Oval',
+                        icon: 'image/oval.png'
+                    }, {
+                        id: 'OT_star',
+                        title: 'Star',
+                        icon: 'image/star.png',
+                        points: [
+                            [0.5 + 0.5 * Math.cos(90 * (Math.PI / 180)), 0.5 + 0.5 * Math.sin(90 * (Math.PI / 180))],
+                            [0.5 + 0.25 * Math.cos(126 * (Math.PI / 180)), 0.5 + 0.25 * Math.sin(126 * (Math.PI / 180))],
+                            [0.5 + 0.5 * Math.cos(162 * (Math.PI / 180)), 0.5 + 0.5 * Math.sin(162 * (Math.PI / 180))],
+                            [0.5 + 0.25 * Math.cos(198 * (Math.PI / 180)), 0.5 + 0.25 * Math.sin(198 * (Math.PI / 180))],
+                            [0.5 + 0.5 * Math.cos(234 * (Math.PI / 180)), 0.5 + 0.5 * Math.sin(234 * (Math.PI / 180))],
+                            [0.5 + 0.25 * Math.cos(270 * (Math.PI / 180)), 0.5 + 0.25 * Math.sin(270 * (Math.PI / 180))],
+                            [0.5 + 0.5 * Math.cos(306 * (Math.PI / 180)), 0.5 + 0.5 * Math.sin(306 * (Math.PI / 180))],
+                            [0.5 + 0.25 * Math.cos(342 * (Math.PI / 180)), 0.5 + 0.25 * Math.sin(342 * (Math.PI / 180))],
+                            [0.5 + 0.5 * Math.cos(18 * (Math.PI / 180)), 0.5 + 0.5 * Math.sin(18 * (Math.PI / 180))],
+                            [0.5 + 0.25 * Math.cos(54 * (Math.PI / 180)), 0.5 + 0.25 * Math.sin(54 * (Math.PI / 180))],
+                            [0.5 + 0.5 * Math.cos(90 * (Math.PI / 180)), 0.5 + 0.5 * Math.sin(90 * (Math.PI / 180))]
                         ]
-                    },
-                    {
-                        id: 'OT_colors',
-                        title: 'Colors',
-                        icon: '',
-                        items: { /* Built dynamically */ }
-                    },
-                    {
-                        id: 'OT_line_width',
-                        title: 'Line Width',
-                        icon: 'image/line_width.png',
-                        items: { /* Built dynamically */ }
-                    },
-                    {
-                        id: 'OT_clear',
-                        title: 'Clear',
-                        icon: 'image/clear.png'
-                    },
-                    {
-                        id: 'OT_capture',
-                        title: 'Capture',
-                        icon: 'image/camera.png',
-                        selectedIcon: 'image/camera_selected.png'
-                    }
-                ]
+                    }]
+                }, {
+                    id: 'OT_colors',
+                    title: 'Colors',
+                    icon: '',
+                    items: { /* Built dynamically */ }
+                }, {
+                    id: 'OT_line_width',
+                    title: 'Line Width',
+                    icon: 'image/line_width.png',
+                    items: { /* Built dynamically */ }
+                }, {
+                    id: 'OT_clear',
+                    title: 'Clear',
+                    icon: 'image/clear.png'
+                }, {
+                    id: 'OT_capture',
+                    title: 'Capture',
+                    icon: 'image/camera.png',
+                    selectedIcon: 'image/camera_selected.png'
+                }],
+                externalWindow: externalWindow || null
             });
 
             // Callback for handling menu actions
-            toolbar.itemClicked(function (id) {
+            toolbar.itemClicked(function(id) {
                 console.log("Callback item id: " + id);
             });
         }
-    };
-    xmlHttp.open( "GET", "config.php", true );
-    xmlHttp.send( null );
-}
 
-function disconnect() {
-    // TODO Handle removing all canvases
-    toolbar.remove();
+        function disconnect() {
+            // TODO Handle removing all canvases
+            toolbar.remove();
 
-    session.disconnect();
-    hide('disconnectLink');
-    hide('publishLink');
-    hide('unpublishLink');
-    hide('screenshareLink');
-}
+            session.disconnect();
+            hide('disconnectLink');
+            hide('publishLink');
+            hide('unpublishLink');
+            hide('screenshareLink');
+        }
 
-// Called when user wants to start publishing to the session
-function startPublishing() {
-    if (!publisher) {
-        var parentDiv = document.getElementById('myCamera');
-        var publisherDiv = document.createElement('div'); // Create a div for the publisher to replace
-        var publisherProperties = {
-            name: 'A web-based OpenTok client',
-            width: '360px',
-            height: '480px'
-        };
-        publisherDiv.setAttribute('id', 'opentok_publisher');
-        parentDiv.appendChild(publisherDiv);
-        publisher = OT.initPublisher(publisherDiv.id, publisherProperties);
-        publisher.publishAudio(false);
-        session.publish(publisher, function (error) {
-            if (error) {
-                console.log('The publisher failed to connect.');
+        // Called when user wants to start publishing to the session
+        function startPublishing(externalWindow, elements) {
+            if ( !publisher || externalWindow ) {
+                var context = externalWindow ? externalWindow.document : window.document;
+
+                var parentDiv;
+                var publisherDiv;
+                if ( !externalWindow ) {
+                    parentDiv = context.getElementById('myCamera');
+                    publisherDiv = context.createElement('div'); // Create a div for the publisher to replace
+                    publisherDiv.setAttribute('id', 'opentok_publisher');
+                    parentDiv.appendChild(publisherDiv);
+                } else {
+                    publisherDiv = elements.publisher;
+                }
+
+                var publisherProperties = {
+                    name: 'A web-based OpenTok client',
+                    width: '360px',
+                    height: '480px'
+                };
+
+                if ( !!externalWindow ) {
+                    publisherProperties.videoSource = 'window';
+                    publisherProperties.width = '800px';
+                    publisherProperties.height = '600px';
+                }
+
+                publisher = OT.initPublisher(publisherDiv, publisherProperties);
+                publisher.publishAudio(false);
+                session.publish(publisher, function(error) {
+                    if (error) {
+                        console.log('The publisher failed to connect.');
+                    }
+                });
+
+                var canvas = new OTSolution.Annotations({
+                    feed: publisher,
+                    container: externalWindow ? elements.annotation : publisherDiv
+                });
+
+                toolbar.addCanvas(canvas);
+
+                // Callback for screen capture event
+                canvas.onScreenCapture(function(dataUrl) {
+                    var win = window.open(dataUrl, '_blank');
+                    win.focus();
+                });
+
+                show('unpublishLink');
+                show('screenshareLink');
+                hide('publishLink');
             }
-        });
+        }
 
-        var canvas = new OTSolution.Annotations({
-            feed: publisher,
-            container: publisherDiv
-        });
-        toolbar.addCanvas(canvas);
+        function stopPublishing() {
+            // Clean up canvas elements
+            toolbar.removeCanvas(publisher.stream.connection.connectionId);
 
-        // Callback for screen capture event
-        canvas.onScreenCapture(function (dataUrl) {
-            var win = window.open(dataUrl, '_blank');
-            win.focus();
-        });
+            if (publisher) {
+                session.unpublish(publisher);
+            }
+            publisher = null;
 
-        show('unpublishLink');
-        show('screenshareLink');
-        hide('publishLink');
-    }
-}
+            show('publishLink');
+            hide('unpublishLink');
+            hide('screenshareLink');
 
-function stopPublishing() {
-    // Clean up canvas elements
-    toolbar.removeCanvas(publisher.stream.connection.connectionId);
+            !!screenshareWindow && screenshareWindow.close();
+        }
 
-    if (publisher) {
-        session.unpublish(publisher);
-    }
-    publisher = null;
+        //--------------------------------------
+        //  OPENTOK EVENT HANDLERS
+        //--------------------------------------
 
-    show('publishLink');
-    hide('unpublishLink');
-    hide('screenshareLink');
-}
+        function sessionConnectedHandler(event) {
+            // Subscribe to all streams currently in the Session
+            for (var i = 0; i < event.streams.length; i++) {
+                addStream(event.streams[i]);
+            }
+            show('disconnectLink');
+            show('publishLink');
+            hide('connectLink');
+        }
 
-//--------------------------------------
-//  OPENTOK EVENT HANDLERS
-//--------------------------------------
+        function streamCreatedHandler(event) {
+            // Subscribe to the newly created streams
+            for (var i = 0; i < event.streams.length; i++) {
+                TB.log('streamCreated - connectionId: ' + event.streams[i].connection.connectionId);
+                TB.log('streamCreated - connectionData: ' + event.streams[i].connection.data);
+                addStream(event.streams[i]);
+            }
+        }
 
-function sessionConnectedHandler(event) {
-    // Subscribe to all streams currently in the Session
-    for (var i = 0; i < event.streams.length; i++) {
-        addStream(event.streams[i]);
-    }
-    show('disconnectLink');
-    show('publishLink');
-    hide('connectLink');
-}
+        function streamDestroyedHandler(event) {
+            // This signals that a stream was destroyed. Any Subscribers will automatically be removed.
+            // This default behaviour can be prevented using event.preventDefault()
 
-function streamCreatedHandler(event) {
-    // Subscribe to the newly created streams
-    for (var i = 0; i < event.streams.length; i++) {
-        TB.log('streamCreated - connectionId: ' + event.streams[i].connection.connectionId);
-        TB.log('streamCreated - connectionData: ' + event.streams[i].connection.data);
-        addStream(event.streams[i]);
-    }
-}
+            // FIXME toolbar.removeCanvas(id) should be called here to clean up the view
+        }
 
-function streamDestroyedHandler(event) {
-    // This signals that a stream was destroyed. Any Subscribers will automatically be removed.
-    // This default behaviour can be prevented using event.preventDefault()
+        function sessionDisconnectedHandler(event) {
+            // This signals that the user was disconnected from the Session. Any subscribers and publishers
+            // will automatically be removed. This default behaviour can be prevented using event.preventDefault()
+            publisher = null;
 
-    // FIXME toolbar.removeCanvas(id) should be called here to clean up the view
-}
+            show('connectLink');
+            hide('disconnectLink');
+            hide('publishLink');
+            hide('unpublishLink');
+        }
 
-function sessionDisconnectedHandler(event) {
-    // This signals that the user was disconnected from the Session. Any subscribers and publishers
-    // will automatically be removed. This default behaviour can be prevented using event.preventDefault()
-    publisher = null;
+        function connectionDestroyedHandler(event) {
+            // This signals that connections were destroyed
+        }
 
-    show('connectLink');
-    hide('disconnectLink');
-    hide('publishLink');
-    hide('unpublishLink');
-}
+        function connectionCreatedHandler(event) {
+            // This signals new connections have been created.
+        }
 
-function connectionDestroyedHandler(event) {
-    // This signals that connections were destroyed
-}
+        function signalHandler(event) {
+            //			var signalsDiv = document.getElementById("signals");
+            //			var messageP = document.createElement("p");
+            //			messageP.innerHTML = event.data;
+            //			signalsDiv.appendChild(messageP);
 
-function connectionCreatedHandler(event) {
-    // This signals new connections have been created.
-}
+            console.log(event.data)
+        }
 
-function signalHandler(event) {
-//			var signalsDiv = document.getElementById("signals");
-//			var messageP = document.createElement("p");
-//			messageP.innerHTML = event.data;
-//			signalsDiv.appendChild(messageP);
+        /*
+         If you un-comment the call to TB.addEventListener('exception', exceptionHandler) above, OpenTok calls the
+         exceptionHandler() method when exception events occur. You can modify this method to further process exception events.
+         If you un-comment the call to TB.setLogLevel(), above, OpenTok automatically displays exception event messages.
+         */
+        function exceptionHandler(event) {
+            alert('Exception: ' + event.code + '::' + event.message);
+        }
 
-    console.log(event.data)
-}
+        //--------------------------------------
+        //  HELPER METHODS
+        //--------------------------------------
 
-/*
- If you un-comment the call to TB.addEventListener('exception', exceptionHandler) above, OpenTok calls the
- exceptionHandler() method when exception events occur. You can modify this method to further process exception events.
- If you un-comment the call to TB.setLogLevel(), above, OpenTok automatically displays exception event messages.
- */
-function exceptionHandler(event) {
-    alert('Exception: ' + event.code + '::' + event.message);
-}
+        function addStream(stream) {
+            // Check if this is the stream that I am publishing, and if so do not publish.
+            if (stream.connection.connectionId == session.connection.connectionId) {
+                return;
+            }
+            var subscriberDiv = document.createElement('div'); // Create a div for the subscriber to replace
+            subscriberDiv.setAttribute('id', stream.streamId); // Give the replacement div the id of the stream as its id.
+            document.getElementById('subscribers').appendChild(subscriberDiv);
+            var subscriber = session.subscribe(stream, subscriberDiv.id);
+            subscribers[stream.streamId] = subscriber;
 
-//--------------------------------------
-//  HELPER METHODS
-//--------------------------------------
+            console.log("Stream ID: " + stream.connection.connectionId + ", Subscriber ID: " + subscriber.stream.connection.connectionId + ", Session ID: " + session.connection.connectionId);
 
-function addStream(stream) {
-    // Check if this is the stream that I am publishing, and if so do not publish.
-    if (stream.connection.connectionId == session.connection.connectionId) {
-        return;
-    }
-    var subscriberDiv = document.createElement('div'); // Create a div for the subscriber to replace
-    subscriberDiv.setAttribute('id', stream.streamId); // Give the replacement div the id of the stream as its id.
-    document.getElementById('subscribers').appendChild(subscriberDiv);
-    var subscriber = session.subscribe(stream, subscriberDiv.id);
-    subscribers[stream.streamId] = subscriber;
+            var canvas = new OTSolution.Annotations({
+                feed: subscriber,
+                container: subscriberDiv
+            });
+            toolbar.addCanvas(canvas);
 
-    console.log("Stream ID: " + stream.connection.connectionId + ", Subscriber ID: " + subscriber.stream.connection.connectionId
-            + ", Session ID: " + session.connection.connectionId);
+            // Callback for screen capture event
+            canvas.onScreenCapture(function(dataUrl) {
+                var win = window.open(dataUrl, '_blank');
+                win.focus();
+            });
+        }
 
-    var canvas = new OTSolution.Annotations({
-        feed:  subscriber,
-        container: subscriberDiv
-    });
-    toolbar.addCanvas(canvas);
+        function show(id) {
+            document.getElementById(id).style.display = 'block';
+        }
 
-    // Callback for screen capture event
-    canvas.onScreenCapture(function (dataUrl) {
-        var win = window.open(dataUrl, '_blank');
-        win.focus();
-    });
-}
+        function hide(id) {
+            document.getElementById(id).style.display = 'none';
+        }
 
-function show(id) {
-    document.getElementById(id).style.display = 'block';
-}
+        function startScreenshare(win) {
 
-function hide(id) {
-    document.getElementById(id).style.display = 'none';
-}
+            if (OT.$.browser() == 'Chrome') {
+                OT.registerScreenSharingExtension('chrome', 'idhnlbjlmkghinljcijgljbmcoonppgi', 2);
+            }
 
-function screenshare() {
-    popupCenter("screenshare.html", 800, 600);
-}
+            OT.checkScreenSharingCapability(function(response) {
+                console.log(response);
+                if (location.protocol == "http:"){
+                    alert('Screen sharing is only available over HTTPS.');
+                } else if (!response.supported) {
+                    alert('This browser does not support screen sharing.');
+                } else if (response.extensionRegistered === false) {
+                    alert('Please register the extension with OpenTok using "OT.registerScreenSharingExtension(...)".');
+                } else {
+                    if (OT.$.browser() == 'Chrome' && response.extensionInstalled === false) {
+                        // extensionInstalled is always undefined in browsers other than Chrome
+                        alert('Please install the screen sharing extension and load this page over HTTPS.');
+                    } else {
+                        // Screen sharing is available. Publish the screen.
+                        var win = popupCenter("screenshare.html", 800, 600);
 
-function popupCenter(url, w, h) {
-    var left = (screen.width/2)-(w/2);
-    var top = (screen.height/2)-(h/2);
-    var win = window.open(url, '', 'toolbar=no, location=no, directories=no, status=no, menubar=no, scrollbars=no, resizable=no, copyhistory=no, width='+w+', height='+h+', top='+top+', left='+left);
+                        // Workaround for 'DOMContentLoaded' not firing
+                        var windowReady = function () {
+                            if ( !!win.createContainerElements ) {
+                                createToolbar(win);
+                                toolbar.createPanel(win);
+                                var elements = win.createContainerElements();
+                                startPublishing(true, elements);
 
-    // Set the variables to share with the window
-    win.toolbar = toolbar;
-}
+                            } else {
+                                setTimeout(windowReady, 150);
+                            }
+                        }
 
-</script>
+                        windowReady();
 
-<style type="text/css" media="screen">
-    body {
-        margin: 0;
-        padding: 0;
-    }
-    #opentok_publisher, .publisherContainer {
-        display: block;
-        top: 45px; /* Set the container below the toolbar */
-        background-color: transparent;
-        position: absolute;
-        left: 0;
-        right: 0;
-    }
-    #OT_toolbar {
-        padding-left: 15px;
-    }
-</style>
+                    }
+                }
+            });
+        }
+
+        function popupCenter(url, w, h) {
+            var left = (screen.width / 2) - (w / 2);
+            var top = (screen.height / 2) - (h / 2);
+            var win = externalWindow = window.open(url, '', 'toolbar=no, location=no, directories=no, status=no, menubar=no, scrollbars=no, resizable=no, copyhistory=no, width=' + w + ', height=' + h + ', top=' + top + ', left=' + left);
+
+            // Set the variables to share with the window
+            win.toolbar = toolbar;
+
+            return win;
+        }
+
+    </script>
+
+    <style type="text/css" media="screen">
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #opentok_publisher,
+        .publisherContainer {
+            display: block;
+            top: 45px;
+            /* Set the container below the toolbar */
+            background-color: transparent;
+            position: absolute;
+            left: 0;
+            right: 0;
+        }
+
+        #OT_toolbar {
+            padding-left: 15px;
+        }
+    </style>
 </head>
+
 <body>
-<div id="links">
-    <input type="button" value="Connect" id="connectLink" onClick="javascript:connect()"/>
-    <input type="button" value="Share screen" id="screenshareLink" onClick="javascript:screenshare()" style="display:none"/>
-    <input type="button" value="Disconnect" id="disconnectLink" onClick="javascript:disconnect()" style="display:none"/>
-    <input type="button" value="Publish" id="publishLink" onClick="javascript:startPublishing()" style="display:none"/>
-    <input type="button" value="Unpublish" id="unpublishLink" onClick="javascript:stopPublishing()"
-           style="display:none"/>
-</div>
-<div id="myCamera" class="publisherContainer"></div>
-<div id="toolbar" style="width: 345px; height: 50px"></div>
-<div id="subscribers" style="position: absolute; top: 75%"></div>
+    <div id="links">
+        <input type="button" value="Connect" id="connectLink" onClick="javascript:connect()" />
+        <input type="button" value="Share screen" id="screenshareLink" onClick="javascript:startScreenshare()" style="display:none" />
+        <input type="button" value="Disconnect" id="disconnectLink" onClick="javascript:disconnect()" style="display:none" />
+        <input type="button" value="Publish" id="publishLink" onClick="javascript:startPublishing()" style="display:none" />
+        <input type="button" value="Unpublish" id="unpublishLink" onClick="javascript:stopPublishing()" style="display:none" />
+    </div>
+    <div id="myCamera" class="publisherContainer"></div>
+    <div id="toolbar" style="width: 345px; height: 50px"></div>
+    <div id="subscribers" style="position: absolute; top: 75%"></div>
 </body>
+
 </html>
