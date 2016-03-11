@@ -239,11 +239,11 @@
                 show('screenshareLink');
                 hide('publishLink');
                 
-                !!externalWindow && stopPublishing();
+                !!externalWindow && stopPublishing(null, true);
             }
         }
 
-        function stopPublishing(screenshare) {
+        function stopPublishing(screenshare, disableCamera) {
             
             var type = screenshare ? 'screen' : 'camera';
             var publisher = publishers[type];
@@ -262,7 +262,7 @@
             hide('unpublishLink');
             !screenshare && hide('screenshareLink');
             hide('stopScreenshareLink');
-            show('publishLink');
+            !disableCamera && show('publishLink');
         }
         
         // Called when the screenshare window is closed
