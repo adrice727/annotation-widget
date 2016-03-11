@@ -757,7 +757,7 @@ OTSolution.Annotations = function(options) {
     };
 
     var clearCanvas = function (incoming, cid) {
-        console.log("cid: " + cid);
+        console.log('cid: ' + cid);
         // Remove all elements from history that were drawn by the sender
         drawHistory = drawHistory.filter(function (history) {
             console.log(history.fromId);

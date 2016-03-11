@@ -16,7 +16,7 @@
 
         var toolbar;
         var session;
-        var publisher;
+        var publishers = {};
         var subscribers = {};
 
         // Un-comment either of the following to set automatic logging and exception handling.
@@ -87,8 +87,8 @@
         function createToolbar(externalWindow) {
 
             var context = externalWindow ? externalWindow.document : window.document;
-
-            toolbar = new OTSolution.Annotations.Toolbar({
+            
+            var toolbarRef = new OTSolution.Annotations.Toolbar({
                 session: session,
                 container: context.getElementById('toolbar'),
                 colors: palette,
@@ -158,9 +158,15 @@
                 }],
                 externalWindow: externalWindow || null
             });
+            
+            if ( !!externalWindow ) {
+                externalWindow.toolbar = toolbarRef;
+            } else {
+                toolbar = toolbarRef;
+            }
 
             // Callback for handling menu actions
-            toolbar.itemClicked(function(id) {
+            toolbarRef.itemClicked(function(id) {
                 console.log("Callback item id: " + id);
             });
         }
@@ -178,7 +184,7 @@
 
         // Called when user wants to start publishing to the session
         function startPublishing(externalWindow, elements) {
-            if ( !publisher || externalWindow ) {
+            if ( !publishers['camera']  || externalWindow ) {
                 var context = externalWindow ? externalWindow.document : window.document;
 
                 var parentDiv;
@@ -204,20 +210,24 @@
                     publisherProperties.height = '600px';
                 }
 
-                publisher = OT.initPublisher(publisherDiv, publisherProperties);
+                var publisher = OT.initPublisher(publisherDiv, publisherProperties);
                 publisher.publishAudio(false);
                 session.publish(publisher, function(error) {
                     if (error) {
                         console.log('The publisher failed to connect.');
                     }
                 });
+                
+                publishers[externalWindow ? 'screen' : 'camera'] = publisher;
 
                 var canvas = new OTSolution.Annotations({
                     feed: publisher,
                     container: externalWindow ? elements.annotation : publisherDiv
                 });
+                
+                var toolbarRef = externalWindow ? externalWindow.toolbar : toolbar;
 
-                toolbar.addCanvas(canvas);
+                toolbarRef.addCanvas(canvas);
 
                 // Callback for screen capture event
                 canvas.onScreenCapture(function(dataUrl) {
@@ -228,23 +238,43 @@
                 show('unpublishLink');
                 show('screenshareLink');
                 hide('publishLink');
+                
+                !!externalWindow && stopPublishing();
             }
         }
 
-        function stopPublishing() {
+        function stopPublishing(screenshare) {
+            
+            var type = screenshare ? 'screen' : 'camera';
+            var publisher = publishers[type];
+            
             // Clean up canvas elements
-            toolbar.removeCanvas(publisher.stream.connection.connectionId);
+            if ( !!publisher && !!publisher.stream ) {
+                toolbar.removeCanvas(publisher.stream.connection.connectionId); 
+            }
 
             if (publisher) {
                 session.unpublish(publisher);
             }
-            publisher = null;
-
-            show('publishLink');
+            
+            delete publishers[type];
+            
             hide('unpublishLink');
-            hide('screenshareLink');
-
-            !!screenshareWindow && screenshareWindow.close();
+            !screenshare && hide('screenshareLink');
+            hide('stopScreenshareLink');
+            show('publishLink');
+        }
+        
+        // Called when the screenshare window is closed
+        function screenshareWindowClosed () {
+            
+            // If the window was not closed manually, the publisher will already be destroyed.
+            // Need to check to see if this is the case before trying to destroy it again.
+            setTimeout(function(){
+                if ( !!publishers.screen ) {
+                    stopPublishing(true);
+                }
+            }, 1000)   
         }
 
         //--------------------------------------
@@ -280,6 +310,7 @@
         function sessionDisconnectedHandler(event) {
             // This signals that the user was disconnected from the Session. Any subscribers and publishers
             // will automatically be removed. This default behaviour can be prevented using event.preventDefault()
+            console.log('disconnect', event);
             publisher = null;
 
             show('connectLink');
@@ -319,6 +350,7 @@
         //--------------------------------------
 
         function addStream(stream) {
+            
             // Check if this is the stream that I am publishing, and if so do not publish.
             if (stream.connection.connectionId == session.connection.connectionId) {
                 return;
@@ -376,10 +408,10 @@
                         var windowReady = function () {
                             if ( !!win.createContainerElements ) {
                                 createToolbar(win);
-                                toolbar.createPanel(win);
+                                win.toolbar.createPanel(win);
                                 var elements = win.createContainerElements();
-                                startPublishing(true, elements);
-
+                                startPublishing(win, elements);
+                                show('stopScreenshareLink');
                             } else {
                                 setTimeout(windowReady, 150);
                             }
@@ -390,6 +422,15 @@
                     }
                 }
             });
+        }
+        
+        function stopScreenshare () {
+            stopPublishing(true);
+            screenshareWindow.close();
+            // When we stop sharing the screen, we can go back to publishing our camera feed
+            setTimeout(function(){
+                !publishers['camera'] && startPublishing();
+            }, 1000);
         }
 
         function popupCenter(url, w, h) {
@@ -432,6 +473,7 @@
     <div id="links">
         <input type="button" value="Connect" id="connectLink" onClick="javascript:connect()" />
         <input type="button" value="Share screen" id="screenshareLink" onClick="javascript:startScreenshare()" style="display:none" />
+        <input type="button" value="Stop screen share" id="stopScreenshareLink" onClick="javascript:stopScreenshare()" style="display:none" />
         <input type="button" value="Disconnect" id="disconnectLink" onClick="javascript:disconnect()" style="display:none" />
         <input type="button" value="Publish" id="publishLink" onClick="javascript:startPublishing()" style="display:none" />
         <input type="button" value="Unpublish" id="unpublishLink" onClick="javascript:stopPublishing()" style="display:none" />

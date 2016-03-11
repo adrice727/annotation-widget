@@ -10,14 +10,23 @@
 
     <script type="text/javascript" charset="utf-8">
         var toolbar;
-        if (!toolbar) {
-            alert('Something went wrong: You must pass an OpenTok annotation toolbar object into the window.')
-        } else {
+        // if (!toolbar) {
+        //     alert('Something went wrong: You must pass an OpenTok annotation toolbar object into the window.')
+        // } else {
+        //     opener = window.opener;
+        //     opener.onbeforeunload = function() {
+        //         window.close();
+        //     };
+        // }
+        
             opener = window.opener;
             opener.onbeforeunload = function() {
                 window.close();
             };
-        }
+            
+            window.onbeforeunload = function() {
+                opener.screenshareWindowClosed();
+            }
 
         function createContainerElements() {
 
