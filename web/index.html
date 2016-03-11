@@ -12,7 +12,6 @@
         var apiKey;
         var sessionId;
         var token;
-        var screenshare;
         var screenshareWindow;
 
         var toolbar;
@@ -62,7 +61,6 @@
                     apiKey = res.key;
                     sessionId = res.sessionId;
                     token = res.token;
-                    screenshare = res.screenshare;
 
                     session = TB.initSession(apiKey, sessionId); // Initialize session
 
@@ -331,8 +329,6 @@
             var subscriber = session.subscribe(stream, subscriberDiv.id);
             subscribers[stream.streamId] = subscriber;
 
-            console.log("Stream ID: " + stream.connection.connectionId + ", Subscriber ID: " + subscriber.stream.connection.connectionId + ", Session ID: " + session.connection.connectionId);
-
             var canvas = new OTSolution.Annotations({
                 feed: subscriber,
                 container: subscriberDiv
@@ -399,7 +395,7 @@
         function popupCenter(url, w, h) {
             var left = (screen.width / 2) - (w / 2);
             var top = (screen.height / 2) - (h / 2);
-            var win = externalWindow = window.open(url, '', 'toolbar=no, location=no, directories=no, status=no, menubar=no, scrollbars=no, resizable=no, copyhistory=no, width=' + w + ', height=' + h + ', top=' + top + ', left=' + left);
+            var win = screenshareWindow = window.open(url, '', 'toolbar=no, location=no, directories=no, status=no, menubar=no, scrollbars=no, resizable=no, copyhistory=no, width=' + w + ', height=' + h + ', top=' + top + ', left=' + left);
 
             // Set the variables to share with the window
             win.toolbar = toolbar;
