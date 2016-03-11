@@ -18,6 +18,7 @@ OTSolution.Annotations = function(options) {
 
     this.parent = options.container;
     this.videoFeed = options.feed;
+    var self = this;
 
     if (this.parent) {
         var canvas = document.createElement('canvas');
@@ -50,7 +51,7 @@ OTSolution.Annotations = function(options) {
     this.canvas = function() {
         return canvas;
     };
-    
+
     /**
      * Links an OpenTok session to the annotation canvas. Typically, this is automatically linked
      * when using {@link Toolbar#addCanvas}.
@@ -149,7 +150,7 @@ OTSolution.Annotations = function(options) {
             });
         }
     };
-    
+
     // TODO Allow the user to choose the image type? (jpg, png) Also allow size?
     /**
      * Captures a screenshot of the annotations displayed on top of the active video feed.
@@ -238,17 +239,17 @@ OTSolution.Annotations = function(options) {
     this.onScreenCapture = function(cb) {
         cbs.push(cb);
     };
-    
+
     this.onResize = function() {
         drawHistory = [];
 
         drawUpdates(updateHistory, true);
 
-        eventHistory.forEach(function(history) { 
+        eventHistory.forEach(function(history) {
             updateCanvas(history, true);
         });
     };
-    
+
     /** Canvas Handling **/
 
     function addEventListeners(el, s, fn) {
@@ -257,9 +258,9 @@ OTSolution.Annotations = function(options) {
             el.addEventListener(evts[i], fn, true);
         }
     }
-    
+
     function updateCanvas (event, resizeEvent) {
-        
+
         // Ensure that our canvas has been properly sized
         if (canvas.width === 0) {
             canvas.width = self.parent.getBoundingClientRect().width;
@@ -268,9 +269,9 @@ OTSolution.Annotations = function(options) {
         if (canvas.height === 0) {
             canvas.height = self.parent.getBoundingClientRect().height;
         }
-        
+
         if (event.offsetY === 0 ) { console.log('no offset', event);};
-        
+
         var baseWidth = !!resizeEvent ? event.canvas.width : self.parent.clientWidth;
         var baseHeight = !!resizeEvent ? event.canvas.height: self.parent.clientHeight;
         var offsetLeft = !!resizeEvent ? event.canvas.offsetLeft : canvas.offsetLeft;
@@ -293,7 +294,9 @@ OTSolution.Annotations = function(options) {
 
         var update;
         var selectedItem = resizeEvent ? event.selectedItem : self.selectedItem;
-        
+
+        window.zcanvas = window.zcanvas || self;
+
         if (selectedItem) {
             if (selectedItem.id === 'OT_pen') {
 
@@ -484,10 +487,10 @@ OTSolution.Annotations = function(options) {
             return;
         }
         event.preventDefault();
-        
+
         // Save raw events to reprocess on canvas resize
         event.selectedItem = self.selectedItem;
-        
+
         if ( event.selectedItem ) {
             event.canvas = {
                 width: canvas.width,
@@ -499,12 +502,13 @@ OTSolution.Annotations = function(options) {
             event.lineWidth = self.lineWidth;
             eventHistory.push(event);
         }
-        
+
         updateCanvas(event);
 
     });
 
     var draw = function (update, resizeEvent) {
+
         if (!ctx) {
             ctx = canvas.getContext('2d');
             ctx.lineCap = 'round';
@@ -514,6 +518,8 @@ OTSolution.Annotations = function(options) {
 
         // Clear the canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        window.drawHistory = drawHistory;
 
         // Repopulate the canvas with items from drawHistory
         drawHistory.forEach(function (history) {
@@ -557,7 +563,7 @@ OTSolution.Annotations = function(options) {
                 ctx.closePath();
             }
         });
-        
+
         var selectedItem = !!resizeEvent ? update.selectedItem : self.selectedItem;
         if (selectedItem && selectedItem.title === 'Pen') {
             if (update) {
@@ -657,7 +663,7 @@ OTSolution.Annotations = function(options) {
     };
 
     var drawIncoming = function (update, resizeEvent, index) {
-        
+
         var iCanvas = {
             width: update.canvasWidth,
             height: update.canvasHeight
@@ -692,7 +698,7 @@ OTSolution.Annotations = function(options) {
         } else {
             scale = canvas.height / iCanvas.height;
         }
-        
+
         var centerX = canvas.width / 2;
         var centerY = canvas.height / 2;
 
@@ -720,29 +726,29 @@ OTSolution.Annotations = function(options) {
             update.fromX = canvas.width - update.fromX;
             update.toX = canvas.width - update.toX;
         }
-        
-        
+
+
         /** Keep history of updates for resize */
         var updateForHistory = JSON.parse(JSON.stringify(update));
         updateForHistory.canvasWidth = canvas.width;
         updateForHistory.canvasHeight = canvas.height;
         updateForHistory.videoWidth = video.width;
         updateForHistory.videoHeight = video.height;
-        
+
         if ( resizeEvent ) {
             updateHistory[index] = updateForHistory;
         } else {
             updateHistory.push(updateForHistory);
         }
         /** ********************************** */
-        
+
         drawHistory.push(update);
 
         draw(null);
     };
 
     var drawUpdates = function (updates, resizeEvent) {
-        
+
         updates.forEach(function (update, index) {
             if (update.id === self.videoFeed.stream.connection.connectionId) {
                 drawIncoming(update, resizeEvent, index);
@@ -768,7 +774,7 @@ OTSolution.Annotations = function(options) {
         } else {
             updateHistory = [];
         }
-        
+
         // Refresh the canvas
         draw();
     };
