@@ -183,13 +183,18 @@
         }
 
         // Called when user wants to start publishing to the session
-        function startPublishing(externalWindow, elements) {
-            if ( !publishers['camera']  || externalWindow ) {
-                var context = externalWindow ? externalWindow.document : window.document;
+        function startPublishing(type, elements) {
+            
+            type = type || 'camera';
+            
+            if ( !publishers[type]) {
+                
+                var windowRef = type === 'camera' ? window : screenshareWindow;
+                var context = windowRef.document;
 
                 var parentDiv;
                 var publisherDiv;
-                if ( !externalWindow ) {
+                if ( type === 'camera' ) {
                     parentDiv = context.getElementById('myCamera');
                     publisherDiv = context.createElement('div'); // Create a div for the publisher to replace
                     publisherDiv.setAttribute('id', 'opentok_publisher');
@@ -200,15 +205,10 @@
 
                 var publisherProperties = {
                     name: 'A web-based OpenTok client',
-                    width: '360px',
-                    height: '480px'
+                    width: type === 'camera' ? '360px' : '800px',
+                    height: type === 'camera' ? '480px' : '600px',
+                    videoSource: type === 'camera' ? undefined : 'window'
                 };
-
-                if ( !!externalWindow ) {
-                    publisherProperties.videoSource = 'window';
-                    publisherProperties.width = '800px';
-                    publisherProperties.height = '600px';
-                }
 
                 var publisher = OT.initPublisher(publisherDiv, publisherProperties);
                 publisher.publishAudio(false);
@@ -218,14 +218,14 @@
                     }
                 });
                 
-                publishers[externalWindow ? 'screen' : 'camera'] = publisher;
+                publishers[type] = publisher;
 
                 var canvas = new OTSolution.Annotations({
                     feed: publisher,
-                    container: externalWindow ? elements.annotation : publisherDiv
+                    container: type === 'camera' ? publisherDiv : elements.annotation
                 });
                 
-                var toolbarRef = externalWindow ? externalWindow.toolbar : toolbar;
+                var toolbarRef = windowRef.toolbar;
 
                 toolbarRef.addCanvas(canvas);
 
@@ -236,45 +236,46 @@
                 });
 
                 show('unpublishLink');
-                show('screenshareLink');
+                type === 'camera' ? show('screenshareLink') : hide('screenshareLink');
                 hide('publishLink');
                 
-                !!externalWindow && stopPublishing(null, true);
+                // If sharing screen, stop publishing camera and prevent user from publishing camera
+                // until screen sharing has ended.
+                if ( type === 'screen' ) {
+                    stopPublishing('camera', true)
+                }
+
             }
         }
 
-        function stopPublishing(screenshare, disableCamera) {
+        function stopPublishing(type, disableCamera) {
             
-            var type = screenshare ? 'screen' : 'camera';
+            type = type || 'camera';
+            
             var publisher = publishers[type];
+            if ( !publisher ) { return; }
             
             // Clean up canvas elements
             if ( !!publisher && !!publisher.stream ) {
-                toolbar.removeCanvas(publisher.stream.connection.connectionId); 
-            }
-
-            if (publisher) {
+                !!publisher.stream && toolbar.removeCanvas(publisher.stream.connection.connectionId); 
                 session.unpublish(publisher);
             }
             
             delete publishers[type];
             
             hide('unpublishLink');
-            !screenshare && hide('screenshareLink');
             hide('stopScreenshareLink');
-            !disableCamera && show('publishLink');
+            type === 'screenshare' && hide('screenshareLink');
+            !!disableCamera ? hide('publishLink') : show('publishLink');
         }
         
         // Called when the screenshare window is closed
         function screenshareWindowClosed () {
-            
-            // If the window was not closed manually, the publisher will already be destroyed.
-            // Need to check to see if this is the case before trying to destroy it again.
-            setTimeout(function(){
-                if ( !!publishers.screen ) {
-                    stopPublishing(true);
-                }
-            }, 1000)   
+            stopPublishing('screen');
+            // When we stop sharing the screen, we can go back to publishing our camera feed
+            setTimeout(function() {
+                startPublishing('camera');
+            }, 500);
         }
 
         //--------------------------------------
@@ -382,7 +383,7 @@
             document.getElementById(id).style.display = 'none';
         }
 
-        function startScreenshare(win) {
+        function startScreenshare() {
 
             if (OT.$.browser() == 'Chrome') {
                 OT.registerScreenSharingExtension('chrome', 'idhnlbjlmkghinljcijgljbmcoonppgi', 2);
@@ -410,7 +411,7 @@
                                 createToolbar(win);
                                 win.toolbar.createPanel(win);
                                 var elements = win.createContainerElements();
-                                startPublishing(win, elements);
+                                startPublishing('screen', elements);
                                 show('stopScreenshareLink');
                             } else {
                                 setTimeout(windowReady, 150);
@@ -425,12 +426,9 @@
         }
         
         function stopScreenshare () {
-            stopPublishing(true);
+            // When the window closes, it will call 'screenshareWindowClosed' which will 
+            // stop publishing the screen and resume publishing the camera feed.
             screenshareWindow.close();
-            // When we stop sharing the screen, we can go back to publishing our camera feed
-            setTimeout(function(){
-                !publishers['camera'] && startPublishing();
-            }, 1000);
         }
 
         function popupCenter(url, w, h) {
