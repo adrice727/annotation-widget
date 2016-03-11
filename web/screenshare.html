@@ -10,12 +10,6 @@
 
     <script type="text/javascript" charset="utf-8">
         var toolbar;
-        var session;
-        var apiKey;
-        var sessionId;
-        var token;
-        var foo = 'bar';
-
         if (!toolbar) {
             alert('Something went wrong: You must pass an OpenTok annotation toolbar object into the window.')
         } else {
@@ -23,26 +17,6 @@
             opener.onbeforeunload = function() {
                 window.close();
             };
-            // // Create a new session for this window
-            // var xmlHttp = new XMLHttpRequest();
-            // xmlHttp.onreadystatechange = function() {
-            //     if (xmlHttp.readyState == 4 && xmlHttp.status == 200) {
-            //         var res = JSON.parse(xmlHttp.responseText);
-            //
-            //         apiKey = res.key;
-            //         sessionId = res.sessionId;
-            //         token = res.token;
-            //
-            //         session = TB.initSession(apiKey, sessionId);
-            //         session.connect(token);
-            //
-            //         // Listeners so we know when to close the window
-            //         session.addEventListener('sessionDisconnected', sessionDisconnectedHandler);
-            //         session.addEventListener('connectionDestroyed', connectionDestroyedHandler);
-            //     }
-            // };
-            // xmlHttp.open( "GET", "config.json", true );
-            // xmlHttp.send( null );
         }
 
         function createContainerElements() {
@@ -59,50 +33,6 @@
             };
         }
 
-        // function startSharing() {
-        //     console.log("Sharing screen");
-        //     var parentDiv = document.getElementById('screenshareContainer');
-        //     var screenContainerElement = document.createElement('div');
-        //     screenContainerElement.setAttribute('id', 'screenshare_publisher');
-        //     parentDiv.appendChild(screenContainerElement);
-        //
-        //     var screenSharingPublisher = OT.initPublisher(
-        //             screenContainerElement.id,
-        //             {
-        //                 videoSource: 'screen',
-        //                 width: window.innerWidth,
-        //                 height: window.innerHeight
-        //             },
-        //             function (error) {
-        //                 if (error) {
-        //                     alert('Something went wrong: ' + error.message);
-        //                 } else {
-        //                     // Add the toolbar
-        //                     var toolbarDiv = toolbar.parent;
-        //                     toolbarDiv.style.position = 'absolute';
-        //                     toolbarDiv.style.top = '0px';
-        //
-        //                     document.body.appendChild(toolbarDiv);
-        //
-        //                     console.log(session);
-        //
-        //                     session.publish(
-        //                             screenSharingPublisher,
-        //                             function (error) {
-        //                                 if (error) {
-        //                                     alert('Something went wrong: ' + error.message);
-        //                                 }
-        //                             });
-        //
-        //                     var canvas = new OTSolution.Annotations({
-        //                         feed: screenSharingPublisher,
-        //                         container: screenContainerElement
-        //                     });
-        //                     toolbar.addCanvas(canvas);
-        //
-        //                 }
-        //             });
-        // }
     </script>
 
     <style type="text/css" media="screen">
